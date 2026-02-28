@@ -270,7 +270,7 @@ cd netwatch
 **2. Configure your environment**
 
 ```bash
-cp .env.example .env
+cp env.example .env
 ```
 
 Edit `.env`:
