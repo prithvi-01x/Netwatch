@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netwatch"
+version = "0.1.0"
+description = "AI-Assisted Real-Time Network Traffic Analyzer — Phase 1: Capture & Parse"
+requires-python = ">=3.12"
+dependencies = [
+    "scapy>=2.5.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "docker>=7.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["netwatch*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["netwatch/backend/tests"]
+log_cli = true
+log_cli_level = "INFO"
+
+[tool.coverage.run]
+source = ["netwatch"]
+omit = ["netwatch/backend/tests/*"]

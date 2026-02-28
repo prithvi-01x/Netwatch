@@ -1,0 +1,706 @@
+/* ══════════════════════════════════════════════════════
+   TOPOLOGY DIAGRAM — cyberpunk dark ops aesthetic
+   ══════════════════════════════════════════════════════ */
+
+:root {
+    --topo-bg: #0a0e14;
+    --topo-node-bg: #0f1420;
+    --topo-node-border: #1e2d40;
+    --topo-green: #00ff88;
+    --topo-red: #ff3355;
+    --topo-blue: #4a9eff;
+    --topo-orange: #ff8c00;
+    --topo-dim: #2a3a4a;
+    --topo-text: #c8d8e8;
+    --topo-muted: #4a6070;
+    --topo-font: var(--font-mono, 'JetBrains Mono', monospace);
+    --anim-play-state: running;
+}
+
+/* ── Outer wrapper ── */
+.topology-diagram {
+    background: var(--topo-bg);
+    min-height: calc(100vh - 120px);
+    padding: 24px 32px 48px;
+    font-family: var(--topo-font);
+    color: var(--topo-text);
+    overflow-x: hidden;
+}
+
+.topology-diagram__header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--topo-node-border);
+}
+
+.topology-diagram__title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--topo-blue);
+    text-transform: uppercase;
+}
+
+.topology-diagram__live {
+    font-size: 0.7rem;
+    color: var(--topo-muted);
+    letter-spacing: 0.1em;
+}
+
+.topology-diagram__live--on {
+    color: var(--topo-green);
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+    animation: blink-live 2s ease-in-out infinite;
+    animation-play-state: var(--anim-play-state);
+}
+
+@keyframes blink-live {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ── Pipeline column ── */
+.topology-diagram__pipeline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* ══════════════════════════════
+   BASE NODE
+   ══════════════════════════════ */
+.topo-node {
+    width: 100%;
+    background: var(--topo-node-bg);
+    border: 1px solid var(--topo-node-border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    position: relative;
+    box-sizing: border-box;
+}
+
+/* scanline texture */
+.topo-node::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg,
+            transparent,
+            transparent 2px,
+            rgba(255, 255, 255, 0.01) 2px,
+            rgba(255, 255, 255, 0.01) 4px);
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+.topo-node__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.topo-node__icon {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+.topo-node__title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--topo-text);
+    text-transform: uppercase;
+}
+
+.topo-node__badge {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border: 1px solid var(--topo-node-border);
+    border-radius: 3px;
+    color: var(--topo-muted);
+    letter-spacing: 0.05em;
+}
+
+.topo-node__badge--live {
+    border-color: var(--topo-green);
+    color: var(--topo-green);
+}
+
+.topo-node__ts {
+    font-size: 0.6rem;
+    color: var(--topo-muted);
+    margin-left: auto;
+}
+
+.topo-node__subtitle {
+    font-size: 0.65rem;
+    color: var(--topo-muted);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+}
+
+.topo-node__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.topo-node__meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.topo-node__meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.topo-node__label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--topo-muted);
+    text-transform: uppercase;
+}
+
+.topo-node__value {
+    font-size: 0.7rem;
+    color: var(--topo-blue);
+}
+
+.topo-node__value--ok {
+    color: var(--topo-green);
+}
+
+.topo-node__ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+/* ── ISP ── */
+.topo-node--isp {
+    width: 220px;
+    text-align: center;
+    border-color: var(--topo-blue);
+    animation: isp-pulse 3s ease-in-out infinite;
+    animation-play-state: var(--anim-play-state);
+}
+
+.topo-node--isp .topo-node__icon {
+    font-size: 1.6rem;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.topo-node--isp .topo-node__title {
+    justify-content: center;
+}
+
+@keyframes isp-pulse {
+
+    0%,
+    100% {
+        border-color: rgba(74, 158, 255, 0.4);
+        box-shadow: 0 0 8px rgba(74, 158, 255, 0.1);
+    }
+
+    50% {
+        border-color: rgba(74, 158, 255, 0.9);
+        box-shadow: 0 0 18px rgba(74, 158, 255, 0.3);
+    }
+}
+
+/* ── Router ── */
+.topo-node--router {
+    width: 260px;
+    text-align: center;
+    border-color: var(--topo-dim);
+}
+
+.topo-node--router .topo-node__icon {
+    display: block;
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+    color: var(--topo-orange);
+}
+
+.topo-node--router .topo-node__meta {
+    justify-content: center;
+}
+
+/* ── Host ── */
+.topo-node--host {
+    border-color: #2a3a50;
+}
+
+.topo-node--host .topo-node__header {
+    border-bottom: 1px solid var(--topo-node-border);
+    padding-bottom: 10px;
+}
+
+/* ── Docker ── */
+.topo-node--docker {
+    border-color: #1e3050;
+}
+
+.topo-node--docker .topo-node__header {
+    border-bottom: 1px solid var(--topo-node-border);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+}
+
+.topo-node--docker .topo-node__icon {
+    color: #2496ed;
+    /* docker blue */
+}
+
+.docker-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* ── Flows ── */
+.topo-node--flows {
+    border-color: #1e3040;
+}
+
+.topo-node--flows .topo-node__header {
+    border-bottom: 1px solid var(--topo-node-border);
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+}
+
+/* ══════════════════════════════
+   DOCKER CONTAINER CARDS
+   ══════════════════════════════ */
+.docker-node {
+    background: #0c1018;
+    border: 1px solid var(--topo-dim);
+    border-radius: 3px;
+    padding: 12px 14px;
+    min-width: 140px;
+    flex: 1 1 140px;
+    max-width: 200px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    box-sizing: border-box;
+}
+
+.docker-node--active {
+    border-color: rgba(0, 255, 136, 0.5);
+    animation: node-active 2s ease-in-out infinite;
+    animation-play-state: var(--anim-play-state);
+}
+
+@keyframes node-active {
+
+    0%,
+    100% {
+        box-shadow: 0 0 8px rgba(0, 255, 136, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+    }
+}
+
+.docker-node__header {
+    margin-bottom: 4px;
+}
+
+.docker-node__name {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--topo-text);
+    letter-spacing: 0.05em;
+    word-break: break-word;
+}
+
+.docker-node__image {
+    font-size: 0.6rem;
+    color: var(--topo-muted);
+    margin-bottom: 8px;
+}
+
+.docker-node__caps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.docker-node__cap-badge {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: rgba(255, 140, 0, 0.15);
+    border: 1px solid rgba(255, 140, 0, 0.5);
+    color: var(--topo-orange);
+    text-transform: uppercase;
+}
+
+.docker-node__ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.docker-node__internal {
+    font-size: 0.6rem;
+    color: var(--topo-muted);
+    font-style: italic;
+    padding: 2px 0;
+}
+
+.docker-node--running .docker-node__status-dot {
+    background: var(--topo-green);
+    box-shadow: 0 0 5px var(--topo-green);
+}
+
+.docker-node--running.docker-node {
+    border-color: rgba(0, 255, 136, 0.3);
+}
+
+.docker-node--stopped .docker-node__status-dot {
+    background: var(--topo-red);
+    box-shadow: 0 0 5px var(--topo-red);
+}
+
+.docker-node--stopped.docker-node {
+    border-color: rgba(255, 51, 85, 0.3);
+    opacity: 0.6;
+}
+
+.docker-node--warning .docker-node__status-dot {
+    background: var(--topo-orange);
+    box-shadow: 0 0 5px var(--topo-orange);
+}
+
+.docker-node--warning.docker-node {
+    border-color: rgba(255, 140, 0, 0.3);
+}
+
+.docker-node__status-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+.docker-node__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.docker-node__ip {
+    font-size: 0.55rem;
+    color: var(--topo-blue);
+    font-family: var(--topo-font);
+}
+
+.docker-node__stat {
+    font-size: 0.55rem;
+    color: var(--topo-text);
+    opacity: 0.8;
+}
+
+/* ══════════════════════════════
+   PORT BADGES
+   ══════════════════════════════ */
+.port-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid;
+    font-size: 0.6rem;
+    font-family: var(--topo-font);
+    position: relative;
+}
+
+.port-badge--active {
+    border-color: var(--topo-green);
+    background: rgba(0, 255, 136, 0.08);
+    animation: node-active 1.5s ease-in-out infinite;
+    animation-play-state: var(--anim-play-state);
+}
+
+.port-badge--open {
+    border-color: rgba(0, 255, 136, 0.3);
+    background: rgba(0, 255, 136, 0.04);
+}
+
+.port-badge--closed {
+    border-color: rgba(255, 51, 85, 0.4);
+    background: rgba(255, 51, 85, 0.05);
+}
+
+.port-badge--filtered {
+    border-color: rgba(255, 140, 0, 0.4);
+    background: rgba(255, 140, 0, 0.05);
+}
+
+.port-badge__pulse {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--topo-green);
+    box-shadow: 0 0 6px var(--topo-green);
+    animation: blink-live 1s ease-in-out infinite;
+    animation-play-state: var(--anim-play-state);
+    flex-shrink: 0;
+}
+
+.port-badge__number {
+    font-weight: 700;
+    color: var(--topo-blue);
+}
+
+.port-badge--closed .port-badge__number {
+    color: var(--topo-red);
+}
+
+.port-badge--filtered .port-badge__number {
+    color: var(--topo-orange);
+}
+
+.port-badge__service {
+    color: var(--topo-text);
+}
+
+.port-badge__service--closed {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+.port-badge__proto {
+    color: var(--topo-muted);
+    font-size: 0.55rem;
+}
+
+.port-badge__icon {
+    color: var(--topo-orange);
+    font-weight: 700;
+}
+
+/* ══════════════════════════════
+   CONNECTORS & PACKET DOTS
+   ══════════════════════════════ */
+.topo-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    padding: 0;
+}
+
+.topo-connector__line {
+    width: 2px;
+    height: 48px;
+    background: linear-gradient(to bottom, var(--topo-node-border), var(--topo-blue), var(--topo-node-border));
+    position: relative;
+    overflow: visible;
+}
+
+.topo-connector--flows .topo-connector__line {
+    height: 32px;
+}
+
+.topo-connector__label {
+    font-size: 0.55rem;
+    color: var(--topo-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* ── Packet dots ── */
+.packet-dot {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--topo-blue);
+    box-shadow: 0 0 6px var(--topo-blue);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    animation: packet-flow 1.4s linear infinite;
+    animation-play-state: var(--anim-play-state);
+}
+
+.packet-dot:nth-child(2) {
+    animation-delay: 0.47s;
+}
+
+.packet-dot:nth-child(3) {
+    animation-delay: 0.94s;
+}
+
+/* speed variants */
+.topo-connector--fast .packet-dot {
+    animation-duration: 0.7s;
+}
+
+.topo-connector--medium .packet-dot {
+    animation-duration: 1.4s;
+}
+
+.topo-connector--slow .packet-dot {
+    animation-duration: 2.8s;
+    background: var(--topo-dim);
+    box-shadow: none;
+}
+
+@keyframes packet-flow {
+    0% {
+        transform: translateX(-50%) translateY(-6px);
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    90% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateX(-50%) translateY(54px);
+        opacity: 0;
+    }
+}
+
+/* ══════════════════════════════
+   FLOWS TABLE
+   ══════════════════════════════ */
+.flows-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.flows-table__empty {
+    font-size: 0.7rem;
+    color: var(--topo-muted);
+    padding: 8px 0;
+    font-style: italic;
+}
+
+.flow-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 2px;
+    font-size: 0.65rem;
+    border-left: 2px solid transparent;
+    animation: slide-in-right 0.3s ease-out;
+    background: rgba(255, 255, 255, 0.02);
+    transition: opacity 0.5s;
+}
+
+.flow-row--highlight {
+    border-left-color: var(--topo-green);
+    background: rgba(0, 255, 136, 0.05);
+}
+
+.flow-row--stale {
+    opacity: 0.4;
+}
+
+@keyframes slide-in-right {
+    from {
+        transform: translateX(16px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.flow-row__src,
+.flow-row__dst {
+    font-size: 0.65rem;
+    color: var(--topo-text);
+    font-family: var(--topo-font);
+    flex-shrink: 0;
+}
+
+.flow-row__arrow {
+    color: var(--topo-muted);
+    flex-shrink: 0;
+}
+
+.flow-row__proto {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+.flow-row__proto--tcp {
+    color: var(--protocol-tcp, #4a9eff);
+}
+
+.flow-row__proto--udp {
+    color: var(--protocol-udp, #3fb950);
+}
+
+.flow-row__proto--dns {
+    color: var(--protocol-dns, #a371f7);
+}
+
+.flow-row__proto--icmp {
+    color: var(--protocol-icmp, #f78166);
+}
+
+.flow-row__pps {
+    color: var(--topo-muted);
+    font-size: 0.6rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.flow-row__bytes {
+    color: var(--topo-muted);
+    font-size: 0.6rem;
+    flex-shrink: 0;
+    min-width: 52px;
+    text-align: right;
+}

@@ -1,0 +1,403 @@
+/* ═══════════════════════════════════════════════════
+   TopologyFlow.css — React Flow custom node styles
+   Cyberpunk dark-ops aesthetic matching the app theme
+   ═══════════════════════════════════════════════════ */
+
+/* Override React Flow canvas background */
+.topology-diagram__canvas .react-flow__renderer {
+    background: var(--topo-bg, #0a0e14);
+}
+
+/* ── Base node shell ── */
+.rf-node {
+    background: #0f1420;
+    border: 1px solid #1e2d40;
+    border-radius: 4px;
+    padding: 10px 14px;
+    min-width: 160px;
+    font-family: var(--topo-font, 'JetBrains Mono', monospace);
+    color: #c8d8e8;
+    font-size: 11px;
+    text-align: center;
+    cursor: default;
+    user-select: none;
+}
+
+.rf-node__icon {
+    font-size: 18px;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.rf-node__title {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #8b9db0;
+    margin-bottom: 4px;
+}
+
+.rf-node__sub {
+    font-size: 9px;
+    color: #4a6070;
+}
+
+.rf-node__value {
+    font-size: 11px;
+    color: #4a9eff;
+    font-family: monospace;
+}
+
+.rf-node__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+.rf-node__label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #4a6070;
+    text-transform: uppercase;
+}
+
+/* ── ISP ── */
+.rf-node--isp {
+    border-color: rgba(74, 158, 255, 0.5);
+    animation: rf-isp-pulse 3s ease-in-out infinite;
+}
+
+@keyframes rf-isp-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 6px rgba(74, 158, 255, 0.15);
+    }
+
+    50% {
+        box-shadow: 0 0 18px rgba(74, 158, 255, 0.4);
+    }
+}
+
+/* ── Router ── */
+.rf-node--router {
+    border-color: rgba(255, 140, 0, 0.4);
+}
+
+.rf-node--router .rf-node__icon {
+    color: #ff8c00;
+}
+
+/* ── Host ── */
+.rf-node--host {
+    border-color: #2a3a50;
+    text-align: left;
+    min-width: 200px;
+}
+
+.rf-node--host .rf-node__title {
+    text-align: left;
+}
+
+/* ═══════════════════════════════════════════════════
+   Container cards
+   ═══════════════════════════════════════════════════ */
+.rf-container {
+    background: #0c1018;
+    border: 1px solid #2a3a4a;
+    border-radius: 3px;
+    padding: 8px 10px;
+    min-width: 190px;
+    max-width: 220px;
+    font-family: var(--topo-font, 'JetBrains Mono', monospace);
+    font-size: 10px;
+    color: #c8d8e8;
+    cursor: pointer;
+    transition: border-color 0.25s, box-shadow 0.25s;
+    user-select: none;
+}
+
+/* Status variants */
+.rf-container--running {
+    border-color: rgba(0, 255, 136, 0.3);
+}
+
+.rf-container--warning {
+    border-color: rgba(255, 140, 0, 0.4);
+    animation: rf-warn-pulse 1.5s ease-in-out infinite;
+}
+
+.rf-container--stopped {
+    border-color: rgba(255, 51, 85, 0.35);
+    opacity: 0.65;
+}
+
+/* Live traffic glow */
+.rf-container--traffic {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    animation: rf-traffic-pulse 2s ease-in-out infinite;
+}
+
+@keyframes rf-traffic-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 6px rgba(0, 255, 136, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 18px rgba(0, 255, 136, 0.5);
+    }
+}
+
+@keyframes rf-warn-pulse {
+
+    0%,
+    100% {
+        border-color: rgba(255, 140, 0, 0.3);
+    }
+
+    50% {
+        border-color: rgba(255, 140, 0, 0.8);
+    }
+}
+
+/* Header row */
+.rf-container__header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+/* Status dot */
+.rf-container__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.rf-container--running .rf-container__dot {
+    background: #00ff88;
+    box-shadow: 0 0 5px #00ff88;
+    animation: rf-dot-pulse 2s ease-in-out infinite;
+}
+
+.rf-container--warning .rf-container__dot {
+    background: #ff8c00;
+    box-shadow: 0 0 5px #ff8c00;
+    animation: rf-dot-pulse 0.8s ease-in-out infinite;
+}
+
+.rf-container--stopped .rf-container__dot {
+    background: #ff3355;
+}
+
+@keyframes rf-dot-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+.rf-container__name {
+    flex: 1;
+    font-weight: 700;
+    font-size: 10px;
+    color: #e0eaf4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rf-container__toggle {
+    font-size: 8px;
+    color: #4a6070;
+}
+
+.rf-container__image {
+    font-size: 9px;
+    color: #4a6070;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.rf-container__ip {
+    font-size: 9px;
+    color: #4a9eff;
+    font-family: monospace;
+}
+
+/* Expanded detail */
+.rf-container__detail {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #1a2030;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Stat row with progress bar */
+.rf-container__stat-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.rf-container__stat-label {
+    width: 24px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #4a6070;
+    text-transform: uppercase;
+}
+
+.rf-container__bar {
+    flex: 1;
+    height: 4px;
+    background: #1a2030;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.rf-container__bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+}
+
+.rf-container__bar-fill--cpu {
+    background: #1f6feb;
+}
+
+.rf-container__bar-fill--mem {
+    background: #8957e5;
+}
+
+.rf-container__stat-val {
+    width: 38px;
+    text-align: right;
+    font-size: 9px;
+    color: #8b949e;
+    font-family: monospace;
+}
+
+/* Ports */
+.rf-container__ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.rf-container__port {
+    font-size: 9px;
+    font-family: monospace;
+    padding: 1px 4px;
+    border-radius: 2px;
+    border: 1px solid;
+}
+
+.rf-container__port--open {
+    border-color: rgba(0, 255, 136, 0.4);
+    color: #00ff88;
+}
+
+.rf-container__port--filtered {
+    border-color: rgba(255, 140, 0, 0.4);
+    color: #ff8c00;
+}
+
+.rf-container__port--closed {
+    border-color: rgba(255, 51, 85, 0.3);
+    color: #ff3355;
+    text-decoration: line-through;
+}
+
+/* Networks */
+.rf-container__networks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.rf-container__network {
+    font-size: 8px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    background: #0d1520;
+    border: 1px solid #1e3050;
+    color: #4a6070;
+}
+
+/* ── Canvas wrapper ── */
+.topology-diagram__canvas {
+    height: calc(100vh - 160px);
+    min-height: 500px;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #1e2d40;
+}
+
+/* ── Header extras ── */
+.topology-diagram__meta {
+    font-size: 10px;
+    color: #4a6070;
+    margin-left: auto;
+}
+
+.topology-diagram__ts {
+    font-size: 10px;
+    color: #2a3a4a;
+}
+
+.topology-diagram__speed {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+}
+
+.topology-diagram__speed--fast {
+    background: rgba(0, 255, 136, 0.1);
+    color: #00ff88;
+}
+
+.topology-diagram__speed--medium {
+    background: rgba(255, 140, 0, 0.1);
+    color: #ff8c00;
+}
+
+.topology-diagram__speed--slow {
+    background: rgba(42, 58, 74, 0.4);
+    color: #4a6070;
+}
+
+/* React Flow overrides to match dark theme */
+.react-flow__controls button {
+    background: #0f1420;
+    border-color: #1e2d40;
+    color: #8b9db0;
+}
+
+.react-flow__controls button:hover {
+    background: #1a2535;
+}
+
+.react-flow__edge-path {
+    transition: stroke-width 0.3s;
+}

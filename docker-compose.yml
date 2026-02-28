@@ -1,0 +1,93 @@
+version: '3.9'
+
+services:
+  # --------------------------------------------------------------------------
+  # Capture service — raw packet capture with minimal Linux capabilities
+  # --------------------------------------------------------------------------
+  capture:
+    build:
+      context: .
+      dockerfile: Dockerfile.capture
+    network_mode: host          # required for libpcap raw socket access
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - INTERFACE=${CAPTURE_INTERFACE:-eth0}
+      - LOCAL_NETWORK=${LOCAL_NETWORK:-192.168.0.0/16}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Backend — FastAPI + aggregation + Docker topology discovery
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - capture
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - DB_PATH=/data/netwatch.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - HOST_PROC_PATH=/host/proc        # where host /proc is mounted
+    volumes:
+      - backend_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro              # read host /proc/net/tcp etc. — no write needed
+    # The socket is owned by the 'docker' group on the host.
+    # Find the GID with: stat -c %g /var/run/docker.sock
+    # Then set it in your .env file: DOCKER_GID=999
+    group_add:
+      - "${DOCKER_GID:-999}"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - netwatch
+
+  # --------------------------------------------------------------------------
+  # Frontend
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - netwatch
+
+  # --------------------------------------------------------------------------
+  # Ollama — LLM inference
+  # --------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - netwatch
+
+networks:
+  netwatch:
+    driver: bridge
+
+volumes:
+  backend_data:
+  ollama_data:

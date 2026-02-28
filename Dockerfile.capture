@@ -1,0 +1,22 @@
+# Dockerfile.capture
+# Minimal, isolated capture container.
+# Only does: sniff → parse → enqueue via Unix socket (Phase 2+).
+# Runs as root with CAP_NET_RAW only (see docker-compose.yml).
+
+FROM python:3.12-slim
+
+# Install libpcap (required by scapy for live capture)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpcap-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps — only what the capture module needs
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir scapy pydantic pydantic-settings
+
+# Copy only the capture-relevant source
+COPY netwatch/ /app/netwatch/
+WORKDIR /app
+
+# Entrypoint — reads INTERFACE and LOCAL_NETWORK from environment
+CMD ["python", "-m", "netwatch.backend.main", "--iface", "${INTERFACE:-eth0}"]

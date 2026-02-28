@@ -1,0 +1,99 @@
+.traffic-charts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    animation: fadeIn 0.5s ease-out;
+}
+
+.traffic-charts__panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--space-md);
+    transition: border-color 0.3s;
+}
+
+.traffic-charts__panel:hover {
+    border-color: var(--text-muted);
+}
+
+.traffic-charts__title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: var(--space-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.traffic-charts__title::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--severity-low);
+}
+
+.traffic-charts__breakdown {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.traffic-charts__breakdown-card {
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--border-color);
+    transition: border-color 0.3s;
+}
+
+.traffic-charts__breakdown-card:hover {
+    border-color: var(--text-muted);
+}
+
+.traffic-charts__breakdown-card h4 {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: var(--space-xs);
+    font-weight: 600;
+}
+
+.traffic-charts__breakdown-list {
+    list-style: none;
+}
+
+.traffic-charts__breakdown-list li {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.4);
+}
+
+.traffic-charts__breakdown-list li:last-child {
+    border-bottom: none;
+}
+
+.traffic-charts__breakdown-list li span:first-child {
+    color: var(--text-primary);
+}
+
+.traffic-charts__breakdown-list li span:last-child {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .traffic-charts__breakdown {
+        grid-template-columns: 1fr;
+    }
+}
