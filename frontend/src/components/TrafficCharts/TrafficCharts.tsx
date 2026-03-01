@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import {
     LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-    AreaChart, Area, Legend,
+    AreaChart, Area, Legend, PieChart, Pie, Cell,
 } from 'recharts'
 import { format } from 'date-fns'
 import type { TrafficDataPoint, StatsResponse } from '../../types'
@@ -104,6 +104,56 @@ export const TrafficCharts: React.FC<Props> = React.memo(({ trafficHistory, stat
                         />
                     </AreaChart>
                 </ResponsiveContainer>
+            </div>
+
+            {/* Chart 3 — Severity Breakdown Donut */}
+            <div className="traffic-charts__panel">
+                <div className="traffic-charts__title">Severity Breakdown</div>
+                {Object.keys(alertsBySeverity).length > 0 ? (
+                    <div className="traffic-charts__donut-wrap">
+                        <ResponsiveContainer width="50%" height={160}>
+                            <PieChart>
+                                <Pie
+                                    data={Object.entries(alertsBySeverity).map(([name, value]) => ({ name, value: value as number }))}
+                                    cx="50%" cy="50%"
+                                    innerRadius={45} outerRadius={70}
+                                    paddingAngle={2}
+                                    dataKey="value"
+                                    isAnimationActive={false}
+                                >
+                                    {Object.keys(alertsBySeverity).map(sev => (
+                                        <Cell key={sev} fill={
+                                            sev === 'CRITICAL' ? 'var(--severity-critical)' :
+                                                sev === 'HIGH' ? 'var(--severity-high)' :
+                                                    sev === 'MEDIUM' ? 'var(--severity-medium)' :
+                                                        'var(--severity-low)'
+                                        } />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 6, fontSize: 12 }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <div className="traffic-charts__donut-legend">
+                            {Object.entries(alertsBySeverity).map(([sev, count]) => (
+                                <div key={sev} className="traffic-charts__donut-item">
+                                    <span className="traffic-charts__donut-dot" style={{
+                                        background:
+                                            sev === 'CRITICAL' ? 'var(--severity-critical)' :
+                                                sev === 'HIGH' ? 'var(--severity-high)' :
+                                                    sev === 'MEDIUM' ? 'var(--severity-medium)' :
+                                                        'var(--severity-low)'
+                                    }} />
+                                    <span className="traffic-charts__donut-label">{sev}</span>
+                                    <span className="traffic-charts__donut-count mono">{count as number}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ padding: '20px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>No severity data yet</div>
+                )}
             </div>
 
             {/* Breakdown cards */}

@@ -1,35 +1,35 @@
 :root {
   /* Background */
-  --bg-primary:    #0d1117;
-  --bg-secondary:  #161b22;
-  --bg-tertiary:   #21262d;
-  --bg-card:       #1c2128;
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-card: #1c2128;
 
   /* Borders */
-  --border-color:  #30363d;
+  --border-color: #30363d;
   --border-radius: 6px;
 
   /* Text */
-  --text-primary:   #e6edf3;
+  --text-primary: #e6edf3;
   --text-secondary: #8b949e;
-  --text-muted:     #484f58;
+  --text-muted: #484f58;
 
   /* Severity */
   --severity-critical: #ff2d2d;
-  --severity-high:     #ff8c00;
-  --severity-medium:   #ffd700;
-  --severity-low:      #4a9eff;
+  --severity-high: #ff8c00;
+  --severity-medium: #ffd700;
+  --severity-low: #4a9eff;
 
   /* Protocol colors */
-  --protocol-tcp:   #4a9eff;
-  --protocol-udp:   #3fb950;
-  --protocol-dns:   #a371f7;
-  --protocol-icmp:  #f78166;
+  --protocol-tcp: #4a9eff;
+  --protocol-udp: #3fb950;
+  --protocol-dns: #a371f7;
+  --protocol-icmp: #f78166;
   --protocol-other: #6e7681;
 
   /* Live indicator */
   --live-green: #3fb950;
-  --dead-gray:  #484f58;
+  --dead-gray: #484f58;
 
   /* Spacing */
   --space-xs: 4px;
@@ -41,4 +41,32 @@
   /* Font */
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg-primary: #f6f8fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eaeef2;
+  --bg-card: #ffffff;
+
+  --border-color: #d0d7de;
+
+  --text-primary: #1f2328;
+  --text-secondary: #57606a;
+  --text-muted: #8c959f;
+
+  --severity-critical: #cf222e;
+  --severity-high: #d4800a;
+  --severity-medium: #9a6700;
+  --severity-low: #0969da;
+
+  --protocol-tcp: #0969da;
+  --protocol-udp: #1a7f37;
+  --protocol-dns: #8250df;
+  --protocol-icmp: #cf222e;
+  --protocol-other: #57606a;
+
+  --live-green: #1a7f37;
+  --dead-gray: #8c959f;
 }

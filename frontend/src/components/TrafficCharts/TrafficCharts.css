@@ -97,3 +97,43 @@
         grid-template-columns: 1fr;
     }
 }
+
+.traffic-charts__donut-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.traffic-charts__donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.traffic-charts__donut-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+}
+
+.traffic-charts__donut-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.traffic-charts__donut-label {
+    color: var(--text-secondary);
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
+
+.traffic-charts__donut-count {
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
