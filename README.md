@@ -29,7 +29,6 @@ NetWatch is a fully local, AI-augmented network traffic analyzer designed for cy
 
 No cloud. No subscriptions. No data leaving your machine.
 
-NetWatch was built in **5 phases** over a 4–6 week development sprint, evolving from a basic packet sniffer into a full detection + explanation pipeline with a live web dashboard.
 
 ---
 
