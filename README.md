@@ -768,38 +768,36 @@ socket.onmessage = (event) => {
 
 ---
 
-## 💻 Frontend Dashboard
+## Frontend Dashboard
 
-The React dashboard provides three views accessible via the top navigation bar.
+The user interface is built with React 18, Vite, and Tailwind CSS, providing three dedicated views accessible from the primary navigation bar.
 
-### View 1: Dashboard
+### View 1: Live Monitoring Dashboard
 
-The primary monitoring view with:
+The primary monitoring interface contains four main components:
 
-- **StatsBar** — Live metrics across the top: packets seen, packets dropped, active flows, alerts fired, windows analyzed
-- **FilterBar** — Filter alerts by severity (CRITICAL / HIGH / MEDIUM / LOW), source IP, or rule name
-- **AlertPanel** — Virtualized, paginated alert list (react-window) with per-alert LLM explanation expansion
-- **TrafficCharts** — Recharts visualizations showing packet rate, protocol distribution, and alert frequency over time
+- **StatsBar**: Real-time counter display tracking packets received, dropped packet counts, active flow table size, and cumulative alerts.
+- **FilterBar**: Live multi-criteria filter supporting severity levels (CRITICAL, HIGH, MEDIUM, LOW), specific detection rules, and source IP addresses.
+- **AlertPanel**: Virtualized list powered by `react-window` for smooth scrolling over large alert sets. Clicking any card expands detailed evidence tables and the LLM remediation explanation.
+- **TrafficCharts**: Recharts time-series graphs displaying instantaneous throughput, protocol distribution (TCP, UDP, ICMP), and alert rate over time.
 
 ### View 2: Network Topology
 
-Built with **ReactFlow**, this view auto-discovers and renders your network:
+An interactive topology diagram built with ReactFlow that discovers and models local infrastructure:
 
-- **ISP node** — upstream internet connection
-- **Router node** — detected gateway
-- **Host nodes** — local hosts with open ports displayed as badges
-- **Docker nodes** — running containers with exposed port labels
+- **Gateway Node**: Identified default router and upstream internet gateway.
+- **Host Nodes**: Local hosts displaying listening TCP and UDP ports parsed from system socket tables.
+- **Container Nodes**: Running Docker containers annotated with mapped container-to-host ports fetched via the Docker engine socket.
 
-Topology data is fetched from `/api/docker/containers` and `/api/host/ports` on load.
+Topology data updates periodically by querying `/api/host/ports` and `/api/docker/containers`.
 
 ### View 3: Attack Graph
 
-D3-powered graph visualization showing attack relationships:
+A directed network graph illustrating threat actors and affected endpoints:
 
-- Nodes represent hosts (colored by role: local/external/scanner)
-- Edges represent observed attack flows
-- Node size scales with alert count
-- Clicking a node opens a detail panel with IP, alert history, and a "filter dashboard by this IP" action
+- **Node Roles**: Color-coded by host classification (local target, external peer, or active scanner).
+- **Attack Edges**: Directed edges representing verified attack flows, sized according to incident frequency.
+- **Node Inspector**: Selecting any host opens an audit drawer showing cumulative alert history, targeted port profiles, and a direct action to filter the primary dashboard by that IP.
 
 ---
 
