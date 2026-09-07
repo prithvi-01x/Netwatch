@@ -73,8 +73,11 @@ class DnsTunnelingRule(BaseRule):
 
         for src_ip, flows in by_src.items():
             total_queries = sum(f.packet_count for f in flows)
-            n = len(flows)
-            avg_payload = sum(f.avg_payload_size for f in flows) / n if n else 0.0
+            total_payload = sum(
+                getattr(f, "_total_payload", 0) or int(f.packet_count * f.avg_payload_size)
+                for f in flows
+            )
+            avg_payload = (total_payload / total_queries) if total_queries else 0.0
 
             query_score   = min(1.0, total_queries / (q_threshold * 2))
             payload_score = min(1.0, avg_payload / (p_threshold * 2))

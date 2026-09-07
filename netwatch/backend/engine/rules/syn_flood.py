@@ -69,13 +69,25 @@ class SynFloodRule(BaseRule):
         ]
         total_tcp_flows = len(tcp_flows)
 
-        # SYN-only flows: SYN seen, no SYN-ACK, and rate above threshold
-        syn_only_flows = [
+        # Candidate SYN-only flows (SYN seen, no SYN-ACK)
+        candidate_syn_flows = [
             f for f in tcp_flows
-            if "SYN" in f.flags_seen
-            and "SYN-ACK" not in f.flags_seen
-            and f.packets_per_second >= self.syn_rate_threshold
+            if "SYN" in f.flags_seen and "SYN-ACK" not in f.flags_seen
         ]
+
+        total_candidate_syn = sum(f.packet_count for f in candidate_syn_flows)
+        window_duration = max(1.0, float(window.window_size_seconds))
+        aggregate_syn_rate = total_candidate_syn / window_duration
+
+        # Qualify flows: if the collective SYN-only rate meets threshold and volume >= threshold,
+        # detect distributed flood across flows; otherwise qualify flows hitting individual rate.
+        if aggregate_syn_rate >= self.syn_rate_threshold and total_candidate_syn >= threshold:
+            syn_only_flows = candidate_syn_flows
+        else:
+            syn_only_flows = [
+                f for f in candidate_syn_flows
+                if f.packets_per_second >= self.syn_rate_threshold
+            ]
 
         total_syn_packets = sum(f.packet_count for f in syn_only_flows)
 
