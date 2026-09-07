@@ -172,12 +172,22 @@ async def get_host_info() -> HostInfoResponse:
 
 
 def _hex_to_ip_port(hex_addr: str) -> tuple[str, int]:
-    """Convert kernel /proc/net hex address 'AABBCCDD:PPPP' → ('ip', port)."""
+    """Convert kernel /proc/net hex address (IPv4 or IPv6) 'ADDR:PORT' → ('ip', port)."""
     addr, port_hex = hex_addr.split(":")
-    # Little-endian 32-bit address
-    ip_int = int(addr, 16)
-    ip = socket.inet_ntoa(struct.pack("<I", ip_int))
     port = int(port_hex, 16)
+    if len(addr) == 8:
+        # IPv4: 32-bit little-endian integer
+        ip_int = int(addr, 16)
+        ip = socket.inet_ntoa(struct.pack("<I", ip_int))
+    elif len(addr) == 32:
+        # IPv6: four 32-bit little-endian words
+        raw_bytes = bytearray()
+        for i in range(0, 32, 8):
+            word_int = int(addr[i:i + 8], 16)
+            raw_bytes.extend(struct.pack("<I", word_int))
+        ip = socket.inet_ntop(socket.AF_INET6, bytes(raw_bytes))
+    else:
+        ip = addr
     return ip, port
 
 

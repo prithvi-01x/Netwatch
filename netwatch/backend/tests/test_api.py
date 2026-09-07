@@ -331,3 +331,24 @@ class TestDockerTopology:
         resp = c.get("/api/docker/topology")
         assert resp.status_code == 503
         assert "Docker" in resp.json()["detail"]
+
+
+class TestHostPortsParsing:
+    def test_hex_to_ip_port_ipv4(self):
+        from netwatch.backend.api.routes.host_ports import _hex_to_ip_port
+        # 0100007F = 127.0.0.1 in little-endian, 1F90 = 8080 in hex
+        ip, port = _hex_to_ip_port("0100007F:1F90")
+        assert ip == "127.0.0.1"
+        assert port == 8080
+
+    def test_hex_to_ip_port_ipv6(self):
+        from netwatch.backend.api.routes.host_ports import _hex_to_ip_port
+        # 32 zeros = :: (all-zeros IPv6), 0050 = 80 in hex
+        ip, port = _hex_to_ip_port("00000000000000000000000000000000:0050")
+        assert ip == "::"
+        assert port == 80
+
+        # Loopback IPv6 ::1 (00000000 00000000 00000000 01000000 in little-endian 32-bit words)
+        ip_loop, port_loop = _hex_to_ip_port("00000000000000000000000001000000:18EB")
+        assert ip_loop == "::1"
+        assert port_loop == 6379

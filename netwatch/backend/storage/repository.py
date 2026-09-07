@@ -313,7 +313,10 @@ class AlertRepository:
                 nodes[dst] = {"id": dst, "type": "victim", "alert_count": 0,
                                "max_severity": "LOW", "rules": set(), "last_seen": 0}
             nodes[dst]["alert_count"] += count
+            nodes[dst]["rules"].add(rule)
             nodes[dst]["last_seen"] = max(nodes[dst]["last_seen"], last_seen)
+            if SEV_ORDER.get(sev, 0) > SEV_ORDER.get(nodes[dst]["max_severity"], 0):
+                nodes[dst]["max_severity"] = sev
 
             edges.append({
                 "source": src,
