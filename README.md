@@ -439,11 +439,11 @@ LOG_LEVEL=INFO
 
 ---
 
-## 🔍 Detection Rules
+## Detection Rules
 
-NetWatch ships with **5 detection rules** out of the box. The engine uses a plugin architecture — adding a new rule is as simple as creating a new Python file in `engine/rules/` and subclassing `BaseRule`.
+NetWatch includes five built-in detection rules. The engine uses dynamic module discovery via `pkgutil.iter_modules`, allowing custom rules to be added by dropping any class subclassing `BaseRule` into `netwatch/backend/engine/rules/`.
 
-### Detection Engine Overview
+### Detection Engine Architecture
 
 ```mermaid
 flowchart LR
@@ -451,22 +451,22 @@ flowchart LR
 
     subgraph DE["DetectionEngine"]
         direction TB
-        CK["⚡ Confidence\nThreshold Check"]
-        WL["🛡️ IP Whitelist\nCheck"]
-        CD["⏱️ Cooldown\nCheck"]
+        CK["Confidence\nThreshold Check"]
+        WL["IP Whitelist\nCheck"]
+        CD["Cooldown\nCheck"]
         CK --> WL --> CD
     end
 
-    DE --> |Alert| DB["💾 SQLite"]
-    DE --> |Alert| LLM["🤖 LLM Enrichment"]
-    DE --> |Suppressed| STATS["📊 Suppression Stats"]
+    DE --> |Alert| DB["SQLite"]
+    DE --> |Alert| LLM["LLM Enrichment"]
+    DE --> |Suppressed| STATS["Suppression Stats"]
 
     subgraph RULES["Rule Modules"]
-        R1["PortScanRule\n🔴 HIGH"]
-        R2["SynFloodRule\n🔴 CRITICAL"]
-        R3["BruteForceRule\n🔴 HIGH"]
-        R4["DnsTunnelingRule\n🟡 HIGH"]
-        R5["BeaconingRule\n🔴 CRITICAL"]
+        R1["PortScanRule\nHIGH"]
+        R2["SynFloodRule\nCRITICAL"]
+        R3["BruteForceRule\nHIGH"]
+        R4["DnsTunnelingRule\nHIGH"]
+        R5["BeaconingRule\nCRITICAL"]
     end
 
     RULES --> AW
@@ -476,145 +476,142 @@ flowchart LR
 
 ### Rule 1: Port Scan Detection
 
-**File:** `engine/rules/port_scan.py`  
-**Severity:** HIGH → CRITICAL (confidence-scaled)  
-**Strategy:** Detects a single source IP contacting an unusually high number of distinct destination ports within a time window.
+- **File**: `engine/rules/port_scan.py`
+- **Severity**: HIGH (scales to CRITICAL with confidence)
+- **Evaluation**: Identifies single source IPs probing an elevated number of unique destination ports within a window.
 
 | Window | Threshold (unique ports) |
 |--------|--------------------------|
-| 1s     | 15 ports                 |
-| 10s    | 30 ports                 |
-| 60s    | 50 ports                 |
+| 1s | 15 ports |
+| 10s | 30 ports |
+| 60s | 50 ports |
 
-**Confidence formula:**
-```
-confidence = min(1.0, unique_ports / (threshold × 3))
-```
+**Confidence score formula:**
+
+$$\text{confidence} = \min\left(1.0, \frac{\text{unique\_ports}}{\text{threshold} \times 3}\right)$$
 
 **Evidence fields:**
-- `src_ip` — the scanning host
-- `unique_ports_contacted` — total distinct ports hit
-- `sampled_ports` — up to 10 example ports (sorted)
-- `threshold` — active threshold for this window size
+- `src_ip`: Scanning host address
+- `unique_ports_contacted`: Total count of target ports reached
+- `sampled_ports`: List of up to 10 sorted destination ports
+- `threshold`: Active port limit for the window
 
 ---
 
 ### Rule 2: SYN Flood Detection
 
-**File:** `engine/rules/syn_flood.py`  
-**Severity:** CRITICAL  
-**Strategy:** Finds TCP flows with `SYN` in flags but no `SYN-ACK`, above a packets-per-second rate threshold. Characteristic of DoS attacks or aggressive half-open scanners.
+- **File**: `engine/rules/syn_flood.py`
+- **Severity**: CRITICAL
+- **Evaluation**: Identifies half-open TCP traffic where flows exhibit `SYN` flags without corresponding `SYN-ACK` responses. Supports distributed multi-flow aggregation when collective SYN rates exceed the rate threshold.
 
-| Window | Min SYN packets |
-|--------|----------------|
-| 1s     | 100            |
-| 10s+   | 500            |
+| Window | Minimum SYN Packets |
+|--------|---------------------|
+| 1s | 100 packets |
+| 10s | 500 packets |
+| 60s | 500 packets |
 
-**Confidence formula:**
-```
-confidence = min(1.0,
-    (total_syn_packets / threshold) × 0.6 +
-    (syn_only_flows / total_tcp_flows) × 0.4
-)
-```
+**Confidence score formula:**
 
-The blend of raw volume (60%) and SYN ratio (40%) prevents false positives from legitimate high-traffic servers while still catching floods.
+$$\text{confidence} = \min\left(1.0, \frac{\text{total\_syn\_packets}}{\text{threshold}} \times 0.6 + \frac{\text{syn\_only\_flows}}{\text{total\_tcp\_flows}} \times 0.4\right)$$
+
+The weighted formula balances absolute packet volume (60%) against the proportion of half-open flows (40%), filtering out legitimate high-throughput servers while capturing distributed attacks.
 
 **Evidence fields:**
-- `src_ips` — all sources contributing to the flood
-- `total_syn_packets` — aggregate SYN packet count
-- `peak_syn_rate` — highest observed SYN rate (pkt/s)
-- `target_ips` — up to 5 targeted hosts
+- `src_ips`: List of source addresses generating SYN traffic
+- `total_syn_packets`: Cumulative SYN packet volume
+- `syn_only_flow_count`: Number of unqualified TCP flows
+- `peak_syn_rate`: Highest observed packets per second
+- `target_ips`: Up to 5 targeted destination addresses
 
 ---
 
 ### Rule 3: Brute Force Detection
 
-**File:** `engine/rules/brute_force.py`  
-**Severity:** HIGH  
-**Strategy:** Identifies flows targeting authentication ports (SSH, FTP, Telnet, RDP, VNC) with high packet rate, small average payload, and sufficient attempt count.
+- **File**: `engine/rules/brute_force.py`
+- **Severity**: HIGH
+- **Evaluation**: Flags rapid connection attempts targeting common remote access services with small payload sizes.
 
-**Auth ports monitored:** `22 (SSH), 21 (FTP), 23 (Telnet), 3389 (RDP), 5900 (VNC)`
+**Monitored ports:** 22 (SSH), 21 (FTP), 23 (Telnet), 3389 (RDP), 5900 (VNC)
 
-| Threshold | Value |
-|-----------|-------|
-| Min attempts/sec | 5.0 |
-| Min total attempts | 20 |
-| Max auth payload size | 256 bytes |
+| Metric | Threshold |
+|--------|-----------|
+| Minimum attempt rate | 5.0 packets/sec |
+| Minimum total attempts | 20 packets |
+| Maximum payload size | 256 bytes |
 
-The low payload size filter (`≤ 256 bytes`) distinguishes credential stuffing from legitimate data transfer on the same ports.
+Limiting evaluation to payloads under 256 bytes isolates authentication handshakes and credential guessing from bulk transfers over encrypted channels.
 
 ---
 
 ### Rule 4: DNS Tunneling Detection
 
-**File:** `engine/rules/dns_tunneling.py`  
-**Severity:** HIGH  
-**Strategy:** Detects data exfiltration through DNS by looking for unusually high query counts or oversized DNS payloads from a single host.
+- **File**: `engine/rules/dns_tunneling.py`
+- **Severity**: HIGH
+- **Evaluation**: Detects data exfiltration over DNS by analyzing query volume and average payload size per source host.
 
-| Trigger | Threshold |
-|---------|-----------|
-| Queries per 10s | > 200 |
-| Avg DNS payload | > 150 bytes |
+| Trigger Condition | Threshold |
+|-------------------|-----------|
+| Query volume | > 200 queries per 10s |
+| Average payload size | > 150 bytes per query |
 
-DNS payloads above 150 bytes are suspicious because legitimate DNS queries are typically 20–60 bytes. Subdomains encoding base64 data inflate this significantly.
+**Confidence score calculation:**
+
+$$\text{query\_score} = \min\left(1.0, \frac{\text{total\_queries}}{\text{threshold} \times 2}\right)$$
+
+$$\text{payload\_score} = \min\left(1.0, \frac{\text{avg\_payload}}{\text{threshold} \times 2}\right)$$
+
+$$\text{confidence} = \max(\text{query\_score}, \text{payload\_score})$$
+
+Standard DNS lookup payloads typically measure between 20 and 60 bytes. Base64 or hex-encoded subdomains used in exfiltration significantly elevate average query size.
 
 ---
 
 ### Rule 5: C2 Beaconing Detection
 
-**File:** `engine/rules/beaconing.py`  
-**Severity:** CRITICAL  
-**Strategy:** Detects Command & Control beaconing — malware periodically checking in with a C2 server. Looks for flows with:
-- Long duration (≥ 45 seconds)
-- Low, steady packet rate (0.1–2.0 pkt/s) — the "heartbeat" pattern
-- Small average payload (≤ 128 bytes)
-- Connecting to non-standard ports (excludes 80, 443, 53, 22, 25, 587)
+- **File**: `engine/rules/beaconing.py`
+- **Severity**: CRITICAL
+- **Evaluation**: Identifies periodic, low-throughput command and control heartbeat traffic.
 
-The combination of these signals separates C2 beaconing from legitimate long-lived connections.
+Criteria:
+- Flow duration >= 45 seconds
+- Mean packet rate between 0.1 and 2.0 packets/sec
+- Average payload size <= 128 bytes
+- Destination port not in standard exclusions (80, 443, 53, 22, 25, 587)
 
 ---
 
 ### Writing a Custom Rule
 
-```python
-# netwatch/backend/engine/rules/my_custom_rule.py
+Create a new file in `netwatch/backend/engine/rules/` that inherits from `BaseRule`:
 
+```python
 from ...aggregation.models import AggregatedWindow
 from ..models import RuleResult, Severity
 from .base import BaseRule
 
-class MyCustomRule(BaseRule):
-    name = "my_custom_rule"
+class CustomRule(BaseRule):
+    name = "custom_traffic_anomaly"
     severity = Severity.HIGH
     enabled = True
-
-    # Your thresholds
-    some_threshold: int = 100
+    packet_limit: int = 250
 
     def analyze(self, window: AggregatedWindow) -> RuleResult:
-        # Examine window.top_flows, window.total_packets,
-        # window.unique_src_ips, window.unique_dst_ports, etc.
-
-        triggered = False  # Your detection logic here
-
-        if not triggered:
+        if window.total_packets > self.packet_limit:
             return RuleResult(
-                triggered=False,
-                confidence=0.0,
-                evidence={},
-                description="no anomaly detected",
+                triggered=True,
+                confidence=0.8,
+                evidence={"total_packets": window.total_packets},
+                description=f"Packet limit exceeded: {window.total_packets}",
             )
-
         return RuleResult(
-            triggered=True,
-            confidence=0.85,
-            evidence={"src_ip": "1.2.3.4", "detail": "..."},
-            description="Anomaly detected from 1.2.3.4",
+            triggered=False,
+            confidence=0.0,
+            evidence={},
+            description="Normal traffic baseline",
         )
 ```
 
-Drop it into `engine/rules/` — the engine discovers and loads all `BaseRule` subclasses automatically via `pkgutil.iter_modules`.
+The engine registers all `BaseRule` subclasses dynamically on startup.
 
 ---
 
