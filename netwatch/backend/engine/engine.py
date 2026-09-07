@@ -88,6 +88,11 @@ class DetectionEngine:
                 continue
 
             self._cooldowns[cooldown_key] = now
+            if len(self._cooldowns) > 100:
+                self._cooldowns = {
+                    k: ts for k, ts in self._cooldowns.items()
+                    if now - ts < self._cooldown_sec
+                }
             alerts.append(alert)
             self.stats["alerts_fired"] += 1
             logger.warning(

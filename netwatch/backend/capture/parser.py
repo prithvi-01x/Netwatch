@@ -37,6 +37,12 @@ if TYPE_CHECKING:
 
 from ..models import PacketMeta
 
+try:
+    from scapy.layers.inet import IP, TCP, UDP, ICMP  # type: ignore[import-untyped]
+    from scapy.layers.dns import DNS  # type: ignore[import-untyped]
+except ImportError:  # pragma: no cover
+    IP = TCP = UDP = ICMP = DNS = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -127,12 +133,8 @@ def parse_packet(
     Returns:
         PacketMeta on success, None if the packet has no IP layer.
     """
-    # Lazy import keeps this module importable without scapy in test env
-    try:
-        from scapy.layers.inet import IP, TCP, UDP, ICMP  # type: ignore[import-untyped]
-        from scapy.layers.dns import DNS  # type: ignore[import-untyped]
-    except ImportError:  # pragma: no cover
-        raise
+    if IP is None:  # pragma: no cover
+        raise RuntimeError("Scapy is not installed. Install with: pip install scapy")
 
     if not pkt.haslayer(IP):
         return None  # ARP, raw Ethernet, etc. — caller increments non_ip counter
