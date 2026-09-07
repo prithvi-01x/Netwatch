@@ -1,4 +1,4 @@
-# ◆ NetWatch — AI-Assisted Real-Time Network Traffic Analyzer
+# NetWatch: Local Network Traffic Analyzer and Intrusion Detection
 
 <div align="center">
 
@@ -9,42 +9,45 @@
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![Tests](https://img.shields.io/badge/Tests-22%20Suites-brightgreen?style=for-the-badge)
 
-**A production-grade, zero-cloud network intrusion detection system with local LLM-powered threat explanation.**
+Local network intrusion detection system with on-device LLM threat explanation.
 
-[Features](#-features) · [Architecture](#-architecture) · [Installation](#-installation) · [Usage](#-usage) · [Detection Rules](#-detection-rules) · [API Reference](#-api-reference) · [Contributing](#-contributing)
+[Features](#features) · [Architecture](#architecture) · [Installation](#installation) · [Detection Rules](#detection-rules) · [API Reference](#api-reference) · [Contributing](#contributing)
 
 </div>
 
 ---
 
-## 👤 Author
+## Author
 
-**Prithvi** — [@prithvi-01x](https://github.com/prithvi-01x)
-
----
-
-## 📖 Overview
-
-NetWatch is a fully local, AI-augmented network traffic analyzer designed for cybersecurity students, researchers, and practitioners who want **real understanding** of what's happening on their network — not just alerts. Built from scratch in Python with a TypeScript/React dashboard, it captures raw packets, aggregates them into time windows, runs a modular rule engine to detect threats, and then uses a **local Ollama LLM** to explain each alert in plain language with actionable remediation steps.
-
-No cloud. No subscriptions. No data leaving your machine.
-
+**Prithvi** ([@prithvi-01x](https://github.com/prithvi-01x))
 
 ---
 
-## ✨ Features
+## Overview
+
+NetWatch inspects live network traffic, flags suspicious behavior with rule-based detection, and generates local explanations for each alert using Ollama. It pairs an asynchronous Python backend (FastAPI, Scapy, SQLite) with a React dashboard to display live flows, topology maps, and alert timelines without sending packet data to external services.
+
+- Packet capture runs locally via Scapy and libpcap with kernel-level BPF filters.
+- A sliding multi-window aggregator tracks per-flow metrics across 1s, 10s, and 60s windows.
+- Pluggable heuristic rules detect port scans, SYN floods, brute-force attempts, DNS tunneling, and C2 beaconing.
+- Ollama generates plain-text threat summaries and analyst remediation guidance directly on your machine.
+- All telemetry and alerts remain stored on the local filesystem.
+
+---
+
+## Features
 
 | Category | Capability |
 |----------|-----------|
 | **Capture** | Live packet capture via Scapy + libpcap with BPF kernel filtering |
-| **Aggregation** | 3-bucket time windows (1s / 10s / 60s) with per-flow tracking |
-| **Detection** | 5 modular, pluggable detection rules with confidence scoring |
-| **LLM** | Local Ollama integration (phi3, mistral, etc.) with fallbacks |
-| **API** | FastAPI REST + 3 WebSocket channels |
-| **Frontend** | React 18 dashboard with live updates, topology map, attack graph |
-| **Storage** | SQLite with auto-migration and pruning |
-| **Docker** | Full Compose stack with least-privilege capture container |
-| **Testing** | 22 test suites covering all major components |
+| **Aggregation** | Multi-bucket time windows (1s, 10s, 60s) with 5-tuple flow state tracking |
+| **Detection** | 5 modular detection rules with confidence scoring and rate limiting |
+| **LLM** | Local Ollama inference (phi3, mistral, llama3) with deterministic fallbacks |
+| **API** | FastAPI REST endpoints plus 3 dedicated WebSocket streaming channels |
+| **Frontend** | React 18 dashboard with virtualized alert lists, network topology, and attack graphs |
+| **Storage** | SQLite database with automated migration runner and snapshot retention pruning |
+| **Docker** | Multi-container Compose configuration with least-privilege capture runtime |
+| **Testing** | 22 pytest suites covering sniffer, aggregator, rules, API, and storage |
 
 ---
 
@@ -1255,8 +1258,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-**Built with ⚡ and obsessive attention to async correctness**
-
-[⬆ Back to top](#-netwatch--ai-assisted-real-time-network-traffic-analyzer)
+[Back to top](#netwatch-local-network-traffic-analyzer-and-intrusion-detection)
 
 </div>
