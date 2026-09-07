@@ -801,25 +801,25 @@ A directed network graph illustrating threat actors and affected endpoints:
 
 ---
 
-## 🧪 Testing
+## Testing
 
-NetWatch has **22 test suites** covering all major components.
+NetWatch has 22 pytest suites covering unit, engine, and integration behaviors.
 
 ```bash
-# Run all tests
+# Run the complete test suite
 pytest
 
-# With coverage
+# Generate an HTML coverage report
 pytest --cov=netwatch --cov-report=html
 
-# Run a specific suite
+# Run detection engine tests with verbose output
 pytest netwatch/backend/tests/test_engine.py -v
 
-# Run with live logging
+# Run with live log output at debug level
 pytest --log-cli-level=DEBUG
 ```
 
-### Test Suite Overview
+### Test Suite Map
 
 ```mermaid
 mindmap
@@ -855,20 +855,19 @@ mindmap
       test_aggregator_advanced
 ```
 
-### Testing Without Root (Capture Layer)
+### Mocking Raw Sockets for Unprivileged CI
 
-The capture layer requires `libpcap` access (root). Tests mock Scapy's `AsyncSniffer` to run without elevated privileges:
+Packet sniffing tests mock Scapy's `AsyncSniffer` class, allowing the full test suite to run in standard continuous integration environments without root permissions or raw socket capabilities:
 
 ```python
-# All sniffer tests use:
 @patch("netwatch.backend.capture.sniffer.AsyncSniffer")
-def test_capture_starts(mock_sniffer, ...):
+def test_capture_lifecycle(mock_sniffer):
     ...
 ```
 
 ---
 
-## 🐳 Docker Architecture
+## Docker Architecture
 
 ```mermaid
 graph TB
@@ -876,8 +875,8 @@ graph TB
         NIC["eth0 / wlan0"]
     end
 
-    subgraph CAPTURE_CONTAINER["capture container\n(host network mode)"]
-        SC["Scapy Sniffer\nNET_RAW + NET_ADMIN\nread_only filesystem"]
+    subgraph CAPTURE_CONTAINER["capture container (host network)"]
+        SC["Scapy Sniffer\nNET_RAW + NET_ADMIN\nread_only root filesystem"]
     end
 
     subgraph NETWATCH_NETWORK["netwatch Docker network (bridge)"]
@@ -904,22 +903,22 @@ graph TB
     CLIENT["Browser"] --> NGINX
 ```
 
-### Security Design of the Capture Container
+### Capture Container Security Boundaries
 
-The capture container is designed with least-privilege principles:
+The capture container isolates raw packet access using Linux capabilities:
 
 ```yaml
 cap_add:
-  - NET_RAW    # Required for libpcap raw sockets
-  - NET_ADMIN  # Required for interface configuration
+  - NET_RAW
+  - NET_ADMIN
 cap_drop:
-  - ALL        # Drop all other Linux capabilities
-read_only: true              # Immutable filesystem
+  - ALL
+read_only: true
 tmpfs:
-  - /tmp:size=64m            # Only /tmp is writable
+  - /tmp:size=64m
 security_opt:
-  - no-new-privileges:true   # Prevent privilege escalation
-network_mode: host           # Required for libpcap
+  - no-new-privileges:true
+network_mode: host
 ```
 
 ---
@@ -992,9 +991,9 @@ stateDiagram-v2
 
 ---
 
-## 📊 Metrics & Observability
+## Metrics & Observability
 
-NetWatch exposes runtime metrics through the `/api/stats` endpoint and the `/ws/stats` WebSocket channel. These are also logged every 5 seconds at `INFO` level.
+Runtime metrics are accessible via `/api/stats` and broadcast over `/ws/stats`. The backend logs a summary snapshot every 5 seconds at `INFO` level:
 
 ```json
 {
@@ -1007,200 +1006,204 @@ NetWatch exposes runtime metrics through the `/api/stats` endpoint and the `/ws/
 }
 ```
 
-Internal counters tracked across the pipeline:
+### Monitored Pipeline Counters
 
-| Counter | Location | Description |
-|---------|----------|-------------|
-| `packets_received` | `METRICS` | Raw packets from libpcap |
-| `packets_parsed_ok` | `METRICS` | Successfully parsed to PacketMeta |
-| `packets_parse_error` | `METRICS` | Failed parsing (logged, not dropped) |
-| `packets_non_ip` | `METRICS` | ARP, etc. — silently skipped |
-| `windows_analyzed` | engine.stats | AggregatedWindows processed |
-| `alerts_fired` | engine.stats | Alerts passing all checks |
-| `alerts_suppressed` | engine.stats | Below confidence threshold |
-| `alerts_cooldown` | engine.stats | Suppressed by cooldown |
-| `alerts_whitelisted` | engine.stats | Suppressed by whitelist |
-| `calls_made` | llm.stats | Total Ollama API calls |
-| `cache_hits` | llm.stats | LRU cache hits |
-| `fallbacks_used` | llm.stats | Times fallback was used |
-| `timeouts` | llm.stats | Ollama calls that timed out |
+| Counter | Metric Origin | Description |
+|---------|---------------|-------------|
+| `packets_received` | `METRICS` | Total raw packets captured from libpcap |
+| `packets_parsed_ok` | `METRICS` | Packets parsed into `PacketMeta` records |
+| `packets_parse_error` | `METRICS` | Malformed packet frames (logged, not dropped) |
+| `packets_non_ip` | `METRICS` | Non-IP frames (ARP, LLC) skipped by policy |
+| `windows_analyzed` | `engine.stats` | Sealed windows evaluated by the rule engine |
+| `alerts_fired` | `engine.stats` | Candidate alerts passing confidence checks |
+| `alerts_suppressed` | `engine.stats` | Alerts below the confidence threshold |
+| `alerts_cooldown` | `engine.stats` | Alerts suppressed by deduplication cooldowns |
+| `alerts_whitelisted` | `engine.stats` | Alerts filtered by the IP whitelist |
+| `calls_made` | `llm.stats` | Total Ollama inference calls |
+| `cache_hits` | `llm.stats` | Deduplicated explanations served from LRU cache |
+| `fallbacks_used` | `llm.stats` | Deterministic rule explanations generated |
+| `timeouts` | `llm.stats` | Ollama requests exceeding timeout threshold |
 
 ---
 
-## 🔐 Security Notes
+## Security Notes
 
 ### Running with Minimal Privileges
 
-Raw packet capture inherently requires elevated access. NetWatch minimizes this surface:
+Packet capture requires Linux packet socket privileges. To run NetWatch natively without executing Python as root:
 
-**Native (Linux):**
 ```bash
-# Grant capability to Python binary instead of running as root
-sudo setcap cap_net_raw,cap_net_admin+eip $(which python3)
+sudo setcap cap_net_raw,cap_net_admin+eip $(readlink -f $(which python3))
 python3 -m netwatch.backend.main --iface eth0
 ```
 
-**Docker:** The capture container drops all capabilities and only keeps `NET_RAW` + `NET_ADMIN`. The backend and frontend containers run with no special privileges.
+In containerized deployments, only the `capture` service is assigned `NET_RAW` and `NET_ADMIN`. The API backend and frontend containers run unprivileged.
 
-### What Data Is Stored
+### Storage Boundary
 
-NetWatch stores only metadata — **no packet payloads**:
+NetWatch stores packet metadata only:
+- Source and destination IP addresses
+- Port numbers and protocols
+- Packet and byte totals
+- Window-level statistical distributions
+- Generated alert descriptions and remediation text
 
-- IP addresses (src/dst)
-- Port numbers
-- Packet counts and byte counts
-- Derived statistics (rates, ratios)
-- LLM-generated explanations (text)
+Packet payload data is not written to the SQLite database, and raw packet bytes are never transmitted to Ollama.
 
-Raw packet data never persists to disk, and raw payload content never reaches the LLM.
+### Network Access Control
 
-### Network Exposure
-
-The API (`port 8000`) and dashboard (`port 3000`) should **not** be exposed to untrusted networks. They are designed for local/LAN access only. There is no authentication layer — add a reverse proxy with auth (Nginx + basic auth, or Tailscale) if remote access is needed.
+The FastAPI API (port 8000) and frontend dashboard (port 3000) do not implement user authentication. Keep these ports bound to localhost or protected behind a reverse proxy (such as Nginx with HTTP basic authentication or WireGuard/Tailscale) when deploying outside isolated test environments.
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
-### No packets being captured
+### No Packets Captured
 
-```bash
-# Check interface name
-ip link show
-# or
-ifconfig -a
+1. Verify the interface name and link state:
+   ```bash
+   ip link show
+   ```
 
-# Check libpcap is installed
-python -c "from scapy.all import AsyncSniffer; print('OK')"
+2. Confirm libpcap and Scapy bindings can access raw sockets:
+   ```bash
+   python3 -c "from scapy.all import AsyncSniffer; print('libpcap OK')"
+   ```
 
-# Verify BPF filter is valid
-tcpdump -i eth0 ip -c 5
-```
+3. Validate traffic flow with tcpdump:
+   ```bash
+   sudo tcpdump -i eth0 -c 5
+   ```
 
-### Ollama not connecting
+### Ollama Connectivity Failures
 
-```bash
-# Check Ollama is running
-curl http://localhost:11434/api/tags
+1. Check that the Ollama service is listening:
+   ```bash
+   curl http://localhost:11434/api/tags
+   ```
 
-# Check model is available
-ollama list
+2. List pulled models:
+   ```bash
+   ollama list
+   ```
 
-# Pull the model if missing
-ollama pull phi3:3.8b
-```
+3. Download the configured model if absent:
+   ```bash
+   ollama pull phi3:3.8b
+   ```
 
-### Alerts not appearing in dashboard
+### Dashboard Does Not Display Alerts
 
-```bash
-# Check WebSocket connection in browser DevTools → Network → WS
-# Check health endpoint
-curl http://localhost:8000/health
+1. Check backend service logs:
+   ```bash
+   docker compose logs backend -f
+   ```
 
-# Check backend logs
-docker compose logs backend -f
-```
+2. Check API health:
+   ```bash
+   curl http://localhost:8000/health
+   ```
 
-### High packet drop rate
+3. Confirm browser WebSocket connectivity in developer tools under Network > WS.
 
-Increase queue sizes in `.env`:
+### High Packet Drop Rate
+
+Under heavy network throughput, increase queue buffers in `.env`:
 ```ini
 CAPTURE_QUEUE_SIZE=50000
+DETECTION_QUEUE_SIZE=5000
 ```
 
-Or reduce capture scope with a tighter BPF filter:
+Alternatively, restrict capture scope with a more specific BPF filter:
 ```ini
 BPF_FILTER=tcp and not port 22
 ```
 
 ---
 
-## 🗺️ Development Roadmap
+## Development Roadmap
 
 ```mermaid
 gantt
-    title NetWatch Development Phases
-    dateFormat  YYYY-MM-DD
-    section Phase 1
-    Packet Capture + Parser       :done,    p1, 2024-01-01, 7d
-    section Phase 2
-    Aggregation + Flow Tracking   :done,    p2, after p1, 7d
-    section Phase 3
-    Detection Engine + 5 Rules    :done,    p3, after p2, 10d
-    section Phase 4
-    FastAPI + WebSockets + DB     :done,    p4, after p3, 7d
-    section Phase 5
-    LLM Integration + Dashboard   :done,    p5, after p4, 14d
-    section Planned
-    PCAP Replay Mode              :active,  f1, 2024-04-01, 7d
-    Alert Export (STIX/SIEM)      :         f2, after f1, 7d
-    GeoIP Enrichment              :         f3, after f2, 5d
-    Prometheus Metrics Endpoint   :         f4, after f3, 3d
-    Auth Layer                    :         f5, after f4, 5d
+    title NetWatch Implementation Milestones
+    dateFormat YYYY-MM-DD
+    section Core Pipeline
+    Packet Capture and Parser       :done, p1, 2024-01-01, 7d
+    Aggregation and Flow Tracking   :done, p2, after p1, 7d
+    Detection Engine and Rules      :done, p3, after p2, 10d
+    section API and Interface
+    FastAPI and WebSockets          :done, p4, after p3, 7d
+    LLM Integration and UI          :done, p5, after p4, 14d
+    section Future Work
+    PCAP Replay Support             :active, f1, 2024-04-01, 7d
+    STIX 2.1 Threat Feed Export     :f2, after f1, 7d
+    GeoIP ASN Enrichment            :f3, after f2, 5d
+    Prometheus Exporter Endpoint    :f4, after f3, 3d
 ```
 
-### Planned Features
+### Planned Capabilities
 
-- **PCAP replay** — Run NetWatch against saved `.pcap` files for offline analysis and testing
-- **STIX 2.1 export** — Export alerts in STIX format for SIEM ingestion
-- **GeoIP enrichment** — Tag external IPs with country + ASN using MaxMind GeoLite2
-- **Prometheus endpoint** — `/metrics` for Grafana dashboards
-- **Basic auth** — Simple token-based auth for the API
-- **Alert deduplication** — Graph-aware deduplication for distributed alerts
-- **Mobile-responsive UI** — Tailwind-based responsive redesign
+- **PCAP Replay**: Parse historical `.pcap` files for regression testing and offline forensics.
+- **STIX 2.1 Export**: Export generated incidents into standardized formats for SIEM ingestion.
+- **GeoIP Enrichment**: Resolve autonomous system numbers (ASNs) and geographic locations for external endpoints.
+- **Prometheus Metrics**: Expose `/metrics` for scraping by Prometheus and Grafana instances.
+- **Authentication**: Bearer token authorization for REST endpoints and WebSocket handshakes.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! The most impactful areas:
+Pull requests are welcome. Focus areas include:
 
-1. **New detection rules** — Add rules in `engine/rules/`. See the Writing a Custom Rule section above.
-2. **Frontend improvements** — React components, better visualizations, dark/light theme.
-3. **Tests** — Especially integration tests and edge cases.
-4. **Documentation** — Examples, guides, blog posts.
+1. **Detection Rules**: Add specialized detection logic in `netwatch/backend/engine/rules/`.
+2. **Dashboard Visualizations**: Extend ReactFlow topology models and traffic charts.
+3. **Integration Tests**: Expand end-to-end capture and rule evaluation test fixtures.
 
-### Development Setup
+### Development Environment
 
 ```bash
 git clone https://github.com/prithvi-01x/netwatch.git
 cd netwatch
 
-# Python
+# Backend virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Frontend
-cd frontend && npm install && npm run dev
+# Frontend development server
+cd frontend
+npm install
+npm run dev
 
-# Run tests
+# Execute tests
 pytest --cov=netwatch
 ```
 
-### Code Style
+### Code Standards
 
-- Python: `ruff` for linting, `black` for formatting
-- TypeScript: Prettier with project defaults
-- All new rules must have corresponding test files in `tests/`
+- Python: Lint with `ruff` and format with `black`.
+- TypeScript: Format with `prettier`.
+- Every new detection rule requires an accompanying test module under `netwatch/backend/tests/`.
 
 ---
 
-## 📁 Data Model Reference
+## Data Model Reference
 
 ### PacketMeta
 
 ```python
 @dataclass
 class PacketMeta:
-    timestamp: float          # Unix timestamp
-    src_ip: str               # Source IP address
-    dst_ip: str               # Destination IP address
+    timestamp: float          # Epoch timestamp in seconds
+    src_ip: str               # Source IPv4 or IPv6 address
+    dst_ip: str               # Destination IPv4 or IPv6 address
     src_port: int             # Source port (0 for ICMP)
     dst_port: int             # Destination port
-    protocol: str             # "TCP" | "UDP" | "ICMP"
-    length: int               # Packet length in bytes
-    payload_size: int         # Application layer payload size
-    flags: str | None         # TCP flags string (e.g. "SYN", "SYN-ACK")
-    direction: str            # "inbound" | "outbound" | "internal"
+    protocol: str             # "TCP", "UDP", or "ICMP"
+    length: int               # Total frame byte length
+    payload_size: int         # Transport payload byte length
+    flags: str | None         # TCP flag string ("SYN", "SYN-ACK")
+    direction: str            # "inbound", "outbound", or "internal"
 ```
 
 ### AggregatedWindow
@@ -1210,13 +1213,13 @@ class PacketMeta:
 class AggregatedWindow:
     window_start: float
     window_end: float
-    window_size_seconds: int       # 1, 10, or 60
+    window_size_seconds: int       # 1, 10, or 60 seconds
     total_packets: int
     total_bytes: int
     unique_src_ips: set[str]
     unique_dst_ports: set[int]
     protocol_counts: dict[str, int]
-    top_flows: list[FlowRecord]    # Top 10 flows by packet count
+    top_flows: list[FlowRecord]
 ```
 
 ### Alert
@@ -1224,15 +1227,15 @@ class AggregatedWindow:
 ```python
 @dataclass
 class Alert:
-    alert_id: str              # UUID4
+    alert_id: str              # UUID4 string identifier
     timestamp: float
     rule_name: str
-    severity: Severity         # CRITICAL | HIGH | MEDIUM | LOW
-    confidence: float          # 0.0 – 1.0
+    severity: Severity         # CRITICAL, HIGH, MEDIUM, or LOW
+    confidence: float          # Bounded 0.0 to 1.0
     src_ip: str
     dst_ip: str
     description: str
-    evidence: dict             # Rule-specific evidence fields
+    evidence: dict             # Serializable rule-specific metadata
     window_start: float
     window_end: float
     window_size_seconds: int
@@ -1243,30 +1246,30 @@ class Alert:
 ```python
 @dataclass
 class LLMExplanation:
-    summary: str               # Plain English attack description
-    attack_phase: str          # reconnaissance | initial_access | ...
+    summary: str               # Threat overview
+    attack_phase: str          # reconnaissance, initial_access, exfiltration
     recommended_action: str    # Analyst guidance
-    llm_confidence: str        # "CONFIDENT" | "UNCERTAIN"
-    ioc_tags: list[str]        # ["port_scan", "recon", ...]
-    fallback_used: bool        # True if LLM was unavailable
+    llm_confidence: str        # "CONFIDENT" or "UNCERTAIN"
+    ioc_tags: list[str]        # ["port_scan", "reconnaissance"]
+    fallback_used: bool        # True if generated via rule fallback
 ```
 
 ---
 
-## 📜 License
+## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+This project is distributed under the MIT License. See [LICENSE](LICENSE) for terms.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- [Scapy](https://scapy.net/) — Python packet manipulation library
-- [FastAPI](https://fastapi.tiangolo.com/) — Modern async Python web framework
-- [Ollama](https://ollama.ai/) — Local LLM inference runtime
-- [ReactFlow](https://reactflow.dev/) — Node-based graph UI for topology visualization
-- [Recharts](https://recharts.org/) — React charting library
-- [Zustand](https://zustand-demo.pmnd.rs/) — Lightweight React state management
+- [Scapy](https://scapy.net/) for raw packet capture and parsing.
+- [FastAPI](https://fastapi.tiangolo.com/) for high-concurrency async APIs.
+- [Ollama](https://ollama.ai/) for local LLM inference.
+- [ReactFlow](https://reactflow.dev/) for interactive graph topology rendering.
+- [Recharts](https://recharts.org/) for time-series traffic visualizations.
+- [Zustand](https://github.com/pmndrs/zustand) for client state management.
 
 ---
 
