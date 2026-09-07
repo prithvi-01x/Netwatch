@@ -51,25 +51,31 @@ NetWatch inspects live network traffic, flags suspicious behavior with rule-base
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
-NetWatch is structured as a **5-layer pipeline**, where data flows from raw packets to enriched, human-readable alerts via a clean async queue architecture.
+NetWatch organizes packet processing into five decoupled stages connected by bounded `asyncio.Queue` instances:
+
+1. **Capture**: Raw packets are read from network interfaces via libpcap, parsed to typed `PacketMeta` records, and enqueued.
+2. **Aggregation**: The aggregator tracks 5-tuple flows and rolls up metrics into sliding 1s, 10s, and 60s windows.
+3. **Detection**: Rules evaluate sealed windows and generate alerts with confidence scores and evidence payloads.
+4. **LLM Enrichment**: Candidate alerts are enriched with local Ollama explanations and analyst guidance.
+5. **API and Delivery**: FastAPI serves REST endpoints and broadcasts real-time alerts and flow statistics over WebSockets to the React dashboard.
 
 ### System Architecture Diagram
 
 ```mermaid
 flowchart TB
-    NI["🌐 Network Interface\n(eth0 / wlan0)"] --> LP
-    LP["libpcap\n(BPF Filter — kernel level)"] --> SC
+    NI["Network Interface\n(eth0 / wlan0)"] --> LP
+    LP["libpcap\n(BPF Filter - kernel level)"] --> SC
     SC["Scapy AsyncSniffer\n(background thread)"] --> PM
 
-    subgraph CAPTURE["📦 CAPTURE LAYER (Phase 1)"]
+    subgraph CAPTURE["CAPTURE LAYER (Phase 1)"]
         PM["PacketMeta\n(typed dataclass)"]
     end
 
     PM -->|asyncio.Queue| AGG
 
-    subgraph AGGREGATION["📊 AGGREGATION LAYER (Phase 2)"]
+    subgraph AGGREGATION["AGGREGATION LAYER (Phase 2)"]
         AGG["Aggregator"]
         FT["FlowTracker\n(5-tuple keyed)"]
         TW1["TimeWindowBucket 1s"]
@@ -83,7 +89,7 @@ flowchart TB
 
     TW1 & TW2 & TW3 -->|AggregatedWindow| ENG
 
-    subgraph DETECTION["🔍 DETECTION ENGINE (Phase 3)"]
+    subgraph DETECTION["DETECTION ENGINE (Phase 3)"]
         ENG["DetectionEngine"]
         PS["PortScanRule"]
         SF["SynFloodRule"]
@@ -95,7 +101,7 @@ flowchart TB
 
     ENG -->|Alert + confidence| LLM
 
-    subgraph LLM_LAYER["🤖 LLM LAYER (Phase 5)"]
+    subgraph LLM_LAYER["LLM LAYER (Phase 5)"]
         LLM["LLMClient\n(Ollama)"]
         PB["PromptBuilder\n(sanitized)"]
         CA["ExplanationCache\n(LRU 200 entries)"]
@@ -107,7 +113,7 @@ flowchart TB
 
     LLM -->|EnrichedAlert| API
 
-    subgraph API_LAYER["🚀 API LAYER (Phase 4/5)"]
+    subgraph API_LAYER["API LAYER (Phase 4/5)"]
         FAPI["FastAPI\n(uvicorn)"]
         WS1["WebSocket /ws/alerts"]
         WS2["WebSocket /ws/flows"]
@@ -119,7 +125,7 @@ flowchart TB
 
     API_LAYER --> FE
 
-    subgraph FRONTEND["💻 FRONTEND (React 18)"]
+    subgraph FRONTEND["FRONTEND (React 18)"]
         DASH["Dashboard View"]
         TOPO["Topology Diagram"]
         GRAPH["Attack Graph"]
@@ -177,7 +183,7 @@ netwatch/
 │       ├── metrics.py               # Prometheus-style counters
 │       ├── capture/
 │       │   ├── sniffer.py           # PacketCapture (Scapy AsyncSniffer)
-│       │   ├── parser.py            # Raw packet → PacketMeta
+│       │   ├── parser.py            # Raw packet -> PacketMeta
 │       │   └── filter.py            # BPF filter construction
 │       ├── aggregation/
 │       │   ├── aggregator.py        # Main aggregation loop
@@ -220,6 +226,7 @@ netwatch/
 │       │   └── migrations.py        # Schema versioning
 │       └── tests/                   # 22 test suites
 ├── frontend/
+│   ├── Dockerfile.frontend          # Nginx production container
 │   ├── src/
 │   │   ├── App.tsx                  # Root component (3 views)
 │   │   ├── components/
@@ -236,10 +243,11 @@ netwatch/
 │   │   └── types.ts
 │   └── package.json
 ├── docker-compose.yml
-├── Dockerfile.capture
+├── Dockerfile.backend               # FastAPI backend container
+├── Dockerfile.capture               # Scapy sniffer container
 ├── pyproject.toml
 ├── requirements.txt
-└── .env                             # Your config
+└── .env                             # Runtime configuration
 ```
 
 ---
