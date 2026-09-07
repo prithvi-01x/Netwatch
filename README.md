@@ -914,9 +914,11 @@ network_mode: host           # Required for libpcap
 
 ---
 
-## 🔄 Pipeline Internals
+## Pipeline Internals
 
 ### Queue Architecture
+
+NetWatch relies on asynchronous queues to isolate capture throughput from downstream analysis:
 
 ```mermaid
 flowchart LR
@@ -932,46 +934,46 @@ flowchart LR
     AQ --> LC["llm_consumer\n(asyncio coroutine)"]
 ```
 
-All queues use `safe_put()` — a wrapper that drops the item and logs a warning rather than blocking if a queue is full. This ensures the capture pipeline is never stalled by a slow downstream consumer.
+Queues use non-blocking `safe_put()` insertions (`put_nowait`). When a queue reaches capacity during sudden traffic spikes, incoming elements are dropped and increment error metric counters rather than blocking the packet capture thread or stalling the event loop.
 
 ### Time Window Architecture
 
-Each packet feeds into three independent `TimeWindowBucket` instances simultaneously:
+Each incoming packet is routed to three concurrent window buckets:
 
 ```
-Packet arrives at t=15.7s
-  → 1s  bucket: [15s, 16s) — almost full, emits at t=16.0
-  → 10s bucket: [10s, 20s) — accumulating
-  → 60s bucket: [00s, 60s) — accumulating
+Packet arrives at t=15.7s:
+  -> 1s  bucket: [15.0s, 16.0s) - seals and emits at t=16.0s
+  -> 10s bucket: [10.0s, 20.0s) - accumulating flows
+  -> 60s bucket: [00.0s, 60.0s) - accumulating flows
 
-Emit at t=16.0:
-  → 1s  window emitted: AggregatedWindow(window_size_seconds=1, ...)
-  → Rules run against 1s window
+Window sealing at t=16.0s:
+  -> Emits AggregatedWindow(window_size_seconds=1, ...)
+  -> Detection engine evaluates 1s rules
 
-Emit at t=20.0:
-  → 10s window emitted: AggregatedWindow(window_size_seconds=10, ...)
-  → Rules run against 10s window (different thresholds)
+Window sealing at t=20.0s:
+  -> Emits AggregatedWindow(window_size_seconds=10, ...)
+  -> Detection engine evaluates 10s rules
 ```
 
-Shorter windows catch fast attacks (SYN floods). Longer windows catch slow, stealthy attacks (port scans spread over time, beaconing).
+During periods of network inactivity, the aggregator uses a 1.0-second queue timeout to tick bucket timers. Any window that elapsed during the quiet period seals and emits immediately, ensuring alerts are not stalled waiting for new traffic bursts.
 
 ### Alert Lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Detected: Rule fires (confidence ≥ threshold)
+    [*] --> Detected: Rule fires (confidence >= threshold)
     Detected --> Whitelisted: src_ip in WHITELIST_IPS
     Detected --> Cooldown: same rule+src within ALERT_COOLDOWN_SECONDS
-    Detected --> Queued: passes all checks
+    Detected --> Queued: passes whitelist and cooldown checks
     Whitelisted --> [*]
     Cooldown --> [*]
     Queued --> GatekeeperCheck
-    GatekeeperCheck --> CacheHit: same alert seen recently
-    GatekeeperCheck --> LLMCall: new alert, above LLM_MIN_CONFIDENCE
-    GatekeeperCheck --> Fallback: below threshold or rate limited
+    GatekeeperCheck --> CacheHit: matching alert cached in LRU
+    GatekeeperCheck --> LLMCall: new alert with confidence >= LLM_MIN_CONFIDENCE
+    GatekeeperCheck --> Fallback: below LLM threshold, rate-limited, or cooldown
     CacheHit --> Persisted
-    LLMCall --> LLMSuccess: Ollama responds in < 8s
-    LLMCall --> Fallback: timeout / error / invalid JSON
+    LLMCall --> LLMSuccess: Ollama responds within timeout
+    LLMCall --> Fallback: timeout, connection error, or invalid JSON
     LLMSuccess --> Persisted
     Fallback --> Persisted
     Persisted --> Broadcast: WebSocket /ws/alerts
