@@ -252,151 +252,131 @@ netwatch/
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 
-| Requirement | Version | Notes |
-|-------------|---------|-------|
-| Python | ≥ 3.12 | Required for `asyncio.timeout()` |
-| Node.js | ≥ 18 | For frontend build |
-| Docker + Compose | ≥ 24 | For containerized deployment |
-| Ollama | Latest | Local LLM inference |
-| libpcap / WinPcap | System | For raw packet capture |
+| Requirement | Supported Version | Purpose |
+|-------------|-------------------|---------|
+| Python | 3.12+ | Asynchronous backend (`asyncio.timeout` support) |
+| Node.js | 20+ | Frontend build toolchain (Vite + React 18) |
+| Docker & Docker Compose | Compose v2 | Containerized multi-service deployment |
+| Ollama | Latest | Optional local LLM inference |
+| libpcap | System package | Raw packet capture bindings (`libpcap-dev`) |
 
 ---
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Docker Compose
 
-The fastest way to get a full stack running with all services.
+Docker Compose runs the capture sniffer, FastAPI backend, React dashboard, and Ollama containers together.
 
-**1. Clone the repository**
+1. **Clone the repository:**
 
-```bash
-git clone https://github.com/prithvi-01x/netwatch.git
-cd netwatch
-```
+   ```bash
+   git clone https://github.com/prithvi-01x/netwatch.git
+   cd netwatch
+   ```
 
-**2. Configure your environment**
+2. **Configure environment settings:**
 
-```bash
-cp env.example .env
-```
+   ```bash
+   cp env.example .env
+   ```
 
-Edit `.env`:
+   Set your network interface and local CIDR in `.env`:
 
-```ini
-# Your network interface (find with: ip link show or ifconfig)
-CAPTURE_INTERFACE=eth0
-LOCAL_NETWORK=192.168.0.0/16
+   ```ini
+   CAPTURE_INTERFACE=eth0
+   LOCAL_NETWORK=192.168.1.0/24
+   OLLAMA_MODEL=phi3:3.8b
+   DOCKER_GID=999
+   LOG_LEVEL=INFO
+   ```
 
-# LLM settings
-OLLAMA_MODEL=phi3:3.8b
+   Identify the Docker socket group ID if using container topology mapping:
+   ```bash
+   stat -c %g /var/run/docker.sock
+   ```
 
-# Optional: Docker socket GID for topology discovery
-# Find with: stat -c %g /var/run/docker.sock
-DOCKER_GID=999
+3. **Pull the Ollama model:**
 
-LOG_LEVEL=INFO
-```
+   ```bash
+   docker compose run --rm ollama ollama pull phi3:3.8b
+   ```
 
-**3. Pull the Ollama model**
+4. **Start the containers:**
 
-```bash
-docker run --rm ollama/ollama pull phi3:3.8b
-# Or for a more powerful model:
-docker run --rm ollama/ollama pull mistral
-```
+   ```bash
+   docker compose up -d
+   ```
 
-**4. Launch the stack**
+   Containers started:
+   - `capture`: Host networking packet capture with `NET_RAW` and `NET_ADMIN` capabilities
+   - `backend`: FastAPI API server on port 8000
+   - `frontend`: Nginx web server on port 3000
+   - `ollama`: Local model inference server on port 11434
 
-```bash
-docker compose up -d
-```
+5. **Verify service health:**
 
-Services started:
-- `capture` → raw packet capture (host network, `NET_RAW` + `NET_ADMIN`)
-- `backend` → FastAPI on `http://localhost:8000`
-- `frontend` → React dashboard on `http://localhost:3000`
-- `ollama` → LLM inference on `http://localhost:11434`
+   ```bash
+   curl http://localhost:8000/health
+   # Returns: {"status":"ok","ws_connections":{"alerts":0,"flows":0,"stats":0}}
+   ```
 
-**5. Check health**
-
-```bash
-curl http://localhost:8000/health
-# → {"status":"ok","ws_connections":{"alerts":0,"flows":0,"stats":0}}
-```
-
-**6. Open the dashboard**
-
-Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
+   Open `http://localhost:3000` in your browser.
 
 ---
 
-### Option 2: Local Development
+### Option 2: Local Development Setup
 
-**1. Install Python dependencies**
+Run the backend and frontend directly on the host system.
 
-```bash
-pip install -e ".[dev]"
-# or
-pip install -r requirements.txt
-```
+1. **Install Python dependencies:**
 
-**2. Install and start Ollama**
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e ".[dev]"
+   ```
 
-```bash
-# macOS
-brew install ollama
-ollama serve &
-ollama pull phi3:3.8b
+2. **Start Ollama and download a model (optional):**
 
-# Linux
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama serve &
-ollama pull phi3:3.8b
-```
+   ```bash
+   ollama serve &
+   ollama pull phi3:3.8b
+   ```
 
-**3. Configure `.env`**
+3. **Start the backend:**
 
-```ini
-INTERFACE=wlan0
-LOCAL_NETWORK=192.168.1.0/24
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=phi3:3.8b
-LLM_ENABLED=true
-DB_PATH=data/alerts.db
-API_PORT=8000
-LOG_LEVEL=INFO
-```
+   Raw packet capture requires packet capture permissions:
 
-**4. Run the backend**
+   ```bash
+   # Grant capabilities without running the entire process as root:
+   sudo setcap cap_net_raw,cap_net_admin+eip $(readlink -f $(which python3))
+   python3 -m netwatch.backend.main --iface wlan0 --local-net 192.168.1.0/24
+   ```
 
-```bash
-# You may need sudo/root for raw socket access
-sudo python -m netwatch.backend.main --iface wlan0 --local-net 192.168.1.0/24
-```
+4. **Start the frontend development server:**
 
-**5. Install and start the frontend**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-```bash
-cd frontend
-npm install
-npm run dev
-# → Dashboard at http://localhost:5173
-```
+   Access the development dashboard at `http://localhost:5173`.
 
 ---
 
-### Option 3: Development Quick-Start (No LLM)
+### Option 3: Offline Mode Without LLM
 
-Run NetWatch without Ollama using static fallback explanations:
+To run NetWatch without an Ollama instance, disable the LLM subsystem:
 
 ```bash
-LLM_ENABLED=false python -m netwatch.backend.main --iface lo
+LLM_ENABLED=false python3 -m netwatch.backend.main --iface eth0 --local-net 192.168.1.0/24
 ```
 
-All alerts will be issued with pre-built static explanations matching the detected rule type. This is useful for development and testing without the overhead of LLM inference.
+Alerts will still generate with deterministic rule-based explanations and remediation steps.
 
 ---
 
