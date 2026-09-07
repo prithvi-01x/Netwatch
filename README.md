@@ -680,44 +680,50 @@ If Ollama is offline, unreachable, or takes longer than 8.0 seconds to respond:
 
 ---
 
-## 📡 API Reference
+## API Reference
+
+The FastAPI backend exposes REST endpoints for data queries and configuration management, alongside WebSocket channels for real-time streaming.
 
 ### REST Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check + WebSocket connection counts |
-| `GET` | `/api/alerts` | Paginated alert history |
-| `GET` | `/api/alerts/{id}` | Single alert by ID |
-| `GET` | `/api/stats` | Pipeline statistics snapshot |
-| `GET` | `/api/stats/history` | Historical stats snapshots |
-| `GET` | `/api/config` | Current runtime configuration |
-| `PATCH` | `/api/config` | Update runtime configuration |
-| `GET` | `/api/docker/containers` | Discovered Docker containers |
-| `GET` | `/api/host/ports` | Open ports on host |
-| `GET` | `/api/graph` | Attack graph data (nodes + edges) |
-| `GET` | `/api/llm/status` | LLM client status + stats |
-| `POST` | `/api/llm/explain` | On-demand LLM explanation |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health status and active WebSocket connection counts |
+| `GET` | `/api/alerts` | Paginated alert query with severity, rule, and IP filters |
+| `GET` | `/api/alerts/{id}` | Detailed alert record with evidence and LLM explanation |
+| `GET` | `/api/stats` | Instantaneous pipeline metrics (packet counts, drop rates, active flows) |
+| `GET` | `/api/stats/history` | Time-series historical metrics snapshots |
+| `GET` | `/api/config` | Active runtime settings |
+| `PATCH` | `/api/config` | Dynamically update runtime configuration parameters |
+| `GET` | `/api/docker/containers` | Discovered Docker container metadata and mapped host ports |
+| `GET` | `/api/host/ports` | Listening TCP and UDP ports parsed from `/proc/net/{tcp,tcp6,udp,udp6}` |
+| `GET` | `/api/graph` | Directed attack graph structure (nodes and threat edges) |
+| `GET` | `/api/llm/status` | Ollama connectivity state, active model, and cache metrics |
+| `POST` | `/api/llm/explain` | On-demand LLM explanation generation for an alert payload |
 
 ### WebSocket Channels
 
-| Channel | Path | Payload | Push Rate |
-|---------|------|---------|-----------|
-| Alerts | `/ws/alerts` | `EnrichedAlert` JSON | On detection |
-| Flows | `/ws/flows` | Top-10 flows by bytes | Every 1s |
-| Stats | `/ws/stats` | Pipeline metrics snapshot | Every 5s |
+The `WebSocketManager` handles concurrent distribution across three dedicated channels. Messages are broadcasted in parallel using `asyncio.gather` with automatic disconnection cleanup:
 
-### Example: Fetch Recent Alerts
+| Channel | Endpoint | Message Schema | Broadcast Frequency |
+|---------|----------|----------------|---------------------|
+| Alerts | `/ws/alerts` | `EnrichedAlert` payload with LLM explanation | Triggered on alert generation |
+| Flows | `/ws/flows` | Top-10 active network flows ordered by byte count | Every 1.0 second |
+| Stats | `/ws/stats` | Pipeline counter snapshot | Every 5.0 seconds |
+
+### Querying Alerts
 
 ```bash
 curl "http://localhost:8000/api/alerts?limit=20&severity=HIGH&offset=0"
 ```
 
+Sample JSON response:
+
 ```json
 {
   "alerts": [
     {
-      "alert_id": "3f8c21a0-...",
+      "alert_id": "3f8c21a0-5b23-4c91-95be-729d38cf2010",
       "timestamp": 1709123456.78,
       "rule_name": "port_scan",
       "severity": "HIGH",
@@ -730,28 +736,33 @@ curl "http://localhost:8000/api/alerts?limit=20&severity=HIGH&offset=0"
         "sampled_ports": [21, 22, 80, 443, 3306, 5432, 6379, 8080, 8443, 9200]
       },
       "llm_explanation": {
-        "summary": "A port scan was detected from 192.168.1.55...",
+        "summary": "Port scanning detected from internal host 192.168.1.55 across common database and web services.",
         "attack_phase": "reconnaissance",
-        "recommended_action": "Block the source IP at the firewall...",
+        "recommended_action": "Inspect 192.168.1.55 for unauthorized scanner utilities. Apply firewall egress rules to restrict host scanning.",
         "llm_confidence": "CONFIDENT",
-        "ioc_tags": ["port_scan", "recon"]
+        "ioc_tags": ["port_scan", "reconnaissance"]
       }
     }
   ],
-  "total": 142
+  "total": 1
 }
 ```
 
-### Example: WebSocket Flow Consumer (JavaScript)
+### Consuming WebSocket Streams
+
+Connect to `/ws/flows` in JavaScript or TypeScript:
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/flows');
+const socket = new WebSocket('ws://localhost:8000/ws/flows');
 
-ws.onmessage = (event) => {
-    const { flows, timestamp } = JSON.parse(event.data);
-    flows.forEach(flow => {
-        console.log(`${flow.src_ip}:${flow.src_port} → ${flow.dst_ip}:${flow.dst_port} | ${flow.pps} pkt/s`);
-    });
+socket.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  for (const flow of data.flows) {
+    console.log(
+      `${flow.src_ip}:${flow.src_port} -> ${flow.dst_ip}:${flow.dst_port} | ` +
+      `${flow.packets} pkts (${flow.pps.toFixed(1)} pkt/s)`
+    );
+  }
 };
 ```
 
