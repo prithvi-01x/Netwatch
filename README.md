@@ -615,14 +615,14 @@ The engine registers all `BaseRule` subclasses dynamically on startup.
 
 ---
 
-## 🤖 LLM Integration
+## LLM Integration
 
-NetWatch integrates with **Ollama** for fully local, privacy-preserving LLM enrichment. When an alert fires, the LLM layer enriches it with:
+NetWatch interfaces with local Ollama instances to generate threat context directly on your machine. When an alert triggers, the LLM layer adds:
 
-- A plain-English `summary` of the attack
-- An assessed `attack_phase` (reconnaissance, lateral_movement, exfiltration, etc.)
-- A `recommended_action` for the analyst
-- An `llm_confidence` score (CONFIDENT / UNCERTAIN)
+- A concise `summary` of the observed network activity
+- The mapped `attack_phase` (such as `reconnaissance`, `initial_access`, or `exfiltration`)
+- A `recommended_action` with practical remediation steps
+- An `llm_confidence` rating (`CONFIDENT` or `UNCERTAIN`)
 - Relevant `ioc_tags`
 
 ```mermaid
@@ -630,19 +630,19 @@ flowchart LR
     A["Raw Alert\nDict"] --> G
 
     subgraph LLM_PIPELINE["LLM Pipeline"]
-        G["LLMGatekeeper\n• min_confidence check\n• rate limit (10/min)\n• per-rule cooldown"]
-        C["ExplanationCache\n• LRU 200 entries\n• SHA-256 keyed\n• same rule+src hit = skip"]
-        P["PromptBuilder\n• whitelist evidence keys\n• strip injection patterns\n• truncate strings < 120 chars"]
-        O["Ollama API\n• /api/chat\n• 8s timeout\n• temp=0.1"]
-        V["ResponseValidator\n• JSON schema check\n• field presence\n• type coercion"]
-        F["Fallback\n• static explanation\n• per rule type\n• always succeeds"]
+        G["LLMGatekeeper\n- min_confidence check\n- rate limit (10/min)\n- per-rule cooldown"]
+        C["ExplanationCache\n- LRU 200 entries\n- SHA-256 keyed\n- deduplicate repeated alerts"]
+        P["PromptBuilder\n- evidence key whitelist\n- strip injection sequences\n- cap strings at 120 chars"]
+        O["Ollama API\n- /api/chat endpoint\n- 8s request timeout\n- temperature 0.1"]
+        V["ResponseValidator\n- JSON schema check\n- key presence verification\n- type normalization"]
+        F["Fallback Engine\n- static explanation\n- rule-specific remediation\n- zero network calls"]
 
-        G -->|gate pass| C
+        G -->|pass| C
         C -->|cache miss| P
         P --> O
         O --> V
-        O -->|timeout/error| F
-        V -->|invalid| F
+        O -->|timeout or error| F
+        V -->|invalid output| F
     end
 
     G -->|cache hit| R["LLMExplanation"]
@@ -650,29 +650,33 @@ flowchart LR
     F --> R
 ```
 
-### Security: Prompt Injection Prevention
+### Prompt Sanitization
 
-The `PromptBuilder` applies strict sanitization before any alert data reaches the LLM:
+The `PromptBuilder` neutralizes untrusted inputs before constructing LLM prompts:
 
-1. **Evidence key whitelist** — Only pre-approved statistical fields are included. Raw payloads, user strings, and hostnames never reach the model.
-2. **Injection pattern stripping** — Regex matches and neutralizes patterns like `ignore previous instructions`, `you are now`, `[INST]`, `<system>`, etc.
-3. **String truncation** — All string values are capped at 120 characters and stripped of control characters.
-4. **JSON-only output enforcement** — The system prompt mandates strict JSON with no preamble. The validator rejects anything that doesn't conform.
+1. **Evidence Whitelisting**: Only vetted numerical counters, port numbers, and rates are passed into prompt templates. Raw packet bytes and untrusted hostnames are excluded.
+2. **Instruction Neutralization**: Prompts filter out control characters and prompt-injection tokens (`ignore previous instructions`, `you are now`, `[INST]`, `<system>`).
+3. **Bounded Value Lengths**: String evidence values are constrained to a maximum of 120 characters.
+4. **JSON Enforcement**: System prompts enforce strict JSON formatting. The `ResponseValidator` rejects non-conforming responses and directs the alert to the fallback pipeline.
 
-### Supported Ollama Models
+### Supported Models
 
-| Model | Size | Speed | Quality | Recommended For |
-|-------|------|-------|---------|----------------|
-| `phi3:3.8b` | 2.3 GB | ⚡ Fast | Good | Default, resource-limited systems |
-| `mistral:7b` | 4.1 GB | Medium | Better | Desktop workstations |
-| `llama3:8b` | 4.7 GB | Medium | Better | High-quality explanations |
-| `gemma2:9b` | 5.4 GB | Slower | Best | Security-focused analysis |
+| Model | Disk Footprint | Inference Speed | Quality | Recommended Use Case |
+|-------|----------------|-----------------|---------|----------------------|
+| `phi3:3.8b` | 2.3 GB | Fast | Good | Default for laptops and resource-constrained environments |
+| `mistral:7b` | 4.1 GB | Moderate | High | Recommended for dedicated developer machines |
+| `llama3:8b` | 4.7 GB | Moderate | High | Detailed operational security explanations |
+| `gemma2:9b` | 5.4 GB | Heavy | Highest | In-depth threat analysis on systems with dedicated GPUs |
 
-Switch models by setting `OLLAMA_MODEL=mistral` in your `.env`.
+Configure the active model by setting `OLLAMA_MODEL=mistral:7b` in `.env`.
 
-### LLM Fallback Behavior
+### Fault Tolerance & Backoff Cooldown
 
-If Ollama is unreachable, busy, times out, or returns invalid JSON, NetWatch **always** falls back to a static, rule-specific explanation. Alerts are never dropped or delayed due to LLM failure. The fallback system provides meaningful (if less detailed) explanations for all 5 rule types.
+If Ollama is offline, unreachable, or takes longer than 8.0 seconds to respond:
+
+- **Immediate Fallback**: The alert is enriched with a deterministic, rule-tailored explanation so pipeline throughput is never degraded.
+- **30-Second Connection Cooldown**: When a connection failure occurs, the client activates an internal 30-second backoff timer. Subsequent alerts bypass connection attempts and use static fallbacks immediately, eliminating timeout delays and preventing log spam during outages.
+- **Zero Data Loss**: Alerts are never dropped when the LLM service is unavailable.
 
 ---
 
