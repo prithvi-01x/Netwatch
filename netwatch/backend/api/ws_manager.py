@@ -13,6 +13,7 @@ Thread safety: designed to be called exclusively from asyncio coroutines.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections import defaultdict
@@ -51,23 +52,26 @@ class WebSocketManager:
 
     async def broadcast(self, channel: str, message: dict) -> None:
         """
-        Send JSON-encoded *message* to all connections on *channel*.
+        Send JSON-encoded *message* to all connections on *channel* concurrently.
 
         Silently removes connections that error during send.
         """
-        if not self._channels[channel]:
+        connections = list(self._channels[channel])
+        if not connections:
             return
 
         payload = json.dumps(message, default=str)  # default=str handles datetime etc.
+
         dead: list[WebSocket] = []
 
-        for ws in list(self._channels[channel]):
+        async def _send(ws: WebSocket):
             try:
                 await ws.send_text(payload)
             except (WebSocketDisconnect, RuntimeError, Exception) as exc:
                 logger.debug("WS send failed (channel=%r): %s — removing", channel, exc)
                 dead.append(ws)
 
+        await asyncio.gather(*[_send(ws) for ws in connections], return_exceptions=True)
         for ws in dead:
             self._channels[channel].discard(ws)
 

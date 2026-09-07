@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Any
 
 try:
@@ -60,6 +61,8 @@ class LLMClient:
         self._cache = ExplanationCache(maxsize=cache_size)
         self._gatekeeper = LLMGatekeeper()
         self._available: bool | None = None  # None = not yet checked
+        self._last_availability_check: float = 0.0
+        self._check_cooldown_sec: float = 30.0
         self.stats: dict[str, int] = {
             "calls_made": 0,
             "cache_hits": 0,
@@ -146,11 +149,17 @@ class LLMClient:
     # ------------------------------------------------------------------
 
     async def _is_available(self, force: bool = False) -> bool:
-        """Check Ollama availability, caching the result after first success."""
+        """Check Ollama availability, caching the result and avoiding repeated timeout delays."""
         if not _HTTPX_AVAILABLE:
             return False
         if self._available is True and not force:
             return True
+        now = time.monotonic()
+        # If previously marked unavailable, do not hammer with 3.0s timeouts on every alert
+        if not force and self._available is False and (now - self._last_availability_check < self._check_cooldown_sec):
+            return False
+
+        self._last_availability_check = now
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"{self.base_url}/api/tags")
