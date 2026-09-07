@@ -1,0 +1,23 @@
+# Multi-stage build for Netwatch Dashboard
+FROM node:22-alpine AS build
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve with light Node or static server on port 3000
+FROM node:22-alpine
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=build /app/dist ./dist
+COPY vite.config.ts index.html ./
+
+EXPOSE 3000
+
+CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "3000"]
