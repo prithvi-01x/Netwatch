@@ -88,6 +88,31 @@ class TimeWindowBucket:
         self._accumulate(packet)
         return None
 
+    def tick(
+        self,
+        top_flows: list[FlowRecord] | None = None,
+        flows_started: int = 0,
+        flows_ended: int = 0,
+    ) -> AggregatedWindow | None:
+        """
+        Check if the window duration has elapsed. If so, and the window has
+        accumulated packets, seal and return it. If the window has no packets,
+        advance the start boundary to now so idle periods don't accumulate.
+        """
+        now_mono = time.monotonic()
+        if now_mono - self._window_start_mono >= self._size:
+            if self._total_packets > 0:
+                completed = self._seal(
+                    top_flows=top_flows or [],
+                    flows_started=flows_started,
+                    flows_ended=flows_ended,
+                )
+                self._reset()
+                return completed
+            else:
+                self._reset()
+        return None
+
     def flush(
         self,
         top_flows: list[FlowRecord] | None = None,

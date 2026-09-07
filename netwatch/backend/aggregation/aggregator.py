@@ -115,12 +115,22 @@ class Aggregator:
             )
             self._input_q.task_done()
         except asyncio.TimeoutError:
-            # No packet arrived within 1 s — still need to tick the buckets
-            # We call _tick_windows with a synthetic empty path (no packet)
-            # by just returning; any elapsed windows will close on the next
-            # real packet. This is acceptable: windows produced during idle
-            # periods with 0 packets are not useful.
+            # No packet arrived within 1s — tick all buckets so any elapsed windows
+            # with accumulated packets are sealed and emitted immediately without
+            # waiting for future traffic bursts.
             self.stats["flows_active"] = self._tracker.active_count
+            top_flows = self._tracker.get_top_flows(n=10)
+            flows_started = self._tracker.pop_new_flow_count()
+            flows_ended = self._pending_expired
+            self._pending_expired = 0
+            for bucket in self._buckets.values():
+                completed = bucket.tick(
+                    top_flows=top_flows,
+                    flows_started=flows_started,
+                    flows_ended=flows_ended,
+                )
+                if completed is not None:
+                    await self._emit(completed)
             return
 
         # --- Update flow tracker ---

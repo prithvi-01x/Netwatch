@@ -131,6 +131,28 @@ class TestAggregatorWindowEmission:
         assert sizes == [1, 10, 60]
 
     @pytest.mark.asyncio
+    async def test_window_emitted_on_idle_timeout(self):
+        """When traffic pauses, elapsed buckets are sealed and emitted on timeout."""
+        iq: asyncio.Queue = asyncio.Queue()
+        oq: asyncio.Queue = asyncio.Queue(maxsize=100)
+        agg = Aggregator(iq, oq)
+
+        # Accumulate 1 packet
+        await iq.put(pkt())
+        await agg._process_one()
+
+        # Set 1s bucket start time into the past
+        agg._buckets[1]._window_start_mono = time.monotonic() - 5.0
+
+        with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError):
+            await agg._process_one()
+
+        windows = await drain_queue(oq)
+        assert len(windows) == 1
+        assert windows[0].window_size_seconds == 1
+        assert windows[0].total_packets == 1
+
+    @pytest.mark.asyncio
     async def test_window_contains_correct_counts(self):
         """Accumulated totals appear in the sealed window."""
         iq: asyncio.Queue = asyncio.Queue()
