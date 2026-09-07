@@ -380,47 +380,61 @@ Alerts will still generate with deterministic rule-based explanations and remedi
 
 ---
 
-## ⚙️ Configuration Reference
+## Configuration Reference
 
-All settings can be set via environment variables or `.env` file. Pydantic Settings handles type coercion and validation automatically.
+Configuration options are managed by Pydantic Settings and loaded from environment variables or a `.env` file in the project root. Setting names are case-insensitive.
+
+### Core Settings
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `INTERFACE` | `str` | `wlan0` | Network interface to sniff (`eth0`, `wlan0`, `en0`) |
+| `BPF_FILTER` | `str` | `ip` | Kernel-level Berkeley Packet Filter expression |
+| `LOCAL_NETWORK` | `str` | `172.16.0.0/12` | Local subnet in CIDR notation for direction tagging |
+| `FLOW_TTL_SECONDS` | `int` | `120` | Flow table retention window before eviction |
+| `DETECTION_CONFIDENCE_THRESHOLD` | `float` | `0.3` | Minimum rule confidence score required to generate an alert |
+| `ALERT_COOLDOWN_SECONDS` | `int` | `30` | Deduplication window per rule and source IP pair |
+| `WHITELIST_IPS` | `list[str]` | `[]` | Excluded IP list (accepts JSON array `["10.0.0.1"]` or comma-delimited `10.0.0.1,10.0.0.2`) |
+| `CAPTURE_QUEUE_SIZE` | `int` | `10000` | Maximum raw `PacketMeta` queue capacity before drops |
+| `DETECTION_QUEUE_SIZE` | `int` | `1000` | Maximum `AggregatedWindow` queue capacity |
+| `ALERT_QUEUE_SIZE` | `int` | `500` | Maximum pending alert queue capacity |
+| `ENRICHED_QUEUE_SIZE` | `int` | `500` | Maximum broadcast queue capacity |
+| `DB_PATH` | `str` | `data/alerts.db` | SQLite database file path |
+| `STATS_SNAPSHOT_MAX_ROWS` | `int` | `2000` | Maximum rows retained in the stats snapshot history table |
+| `API_HOST` | `str` | `0.0.0.0` | Bind address for the FastAPI web server |
+| `API_PORT` | `int` | `8000` | Listening port for the FastAPI web server |
+| `OLLAMA_URL` | `str` | `http://localhost:11434` | HTTP endpoint for the Ollama server |
+| `OLLAMA_MODEL` | `str` | `phi3:3.8b` | Ollama model identifier |
+| `LLM_ENABLED` | `bool` | `true` | Enables or disables Ollama alert enrichment |
+| `LLM_MIN_CONFIDENCE` | `float` | `0.5` | Minimum alert confidence required to trigger LLM inference |
+| `LLM_MAX_CALLS_PER_MINUTE` | `int` | `10` | Global sliding-window rate limit for LLM calls |
+| `LLM_COOLDOWN_SECONDS` | `int` | `30` | Per-rule and source IP backoff cooldown for LLM requests |
+| `LOG_LEVEL` | `str` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+
+### Example `.env` File
 
 ```ini
-# ── Capture ──────────────────────────────────────────────────────────
-INTERFACE=wlan0                     # Network interface to capture on
-BPF_FILTER=ip                       # Berkeley Packet Filter expression
-LOCAL_NETWORK=172.16.0.0/12         # Your LAN CIDR (for direction tagging)
-FLOW_TTL_SECONDS=120                # How long idle flows are kept alive
+INTERFACE=eth0
+LOCAL_NETWORK=192.168.1.0/24
+BPF_FILTER=ip
+FLOW_TTL_SECONDS=120
 
-# ── Detection ────────────────────────────────────────────────────────
-DETECTION_CONFIDENCE_THRESHOLD=0.3  # Minimum confidence to fire an alert
-ALERT_COOLDOWN_SECONDS=30           # Suppress same rule+src combo for N seconds
-WHITELIST_IPS=[]                    # IPs that never trigger alerts
-                                    # e.g. WHITELIST_IPS=["10.0.0.1","10.0.0.2"]
+DETECTION_CONFIDENCE_THRESHOLD=0.3
+ALERT_COOLDOWN_SECONDS=30
+WHITELIST_IPS=127.0.0.1,192.168.1.1
 
-# ── Queues ───────────────────────────────────────────────────────────
-CAPTURE_QUEUE_SIZE=10000            # Max buffered raw packets
-DETECTION_QUEUE_SIZE=1000           # Max buffered windows
-ALERT_QUEUE_SIZE=500                # Max unprocessed alerts
-ENRICHED_QUEUE_SIZE=500             # Max enriched alerts awaiting broadcast
-
-# ── Storage ──────────────────────────────────────────────────────────
-DB_PATH=data/alerts.db              # SQLite database location
-STATS_SNAPSHOT_MAX_ROWS=2000        # Max stats rows before pruning
-
-# ── API ──────────────────────────────────────────────────────────────
+DB_PATH=data/alerts.db
 API_HOST=0.0.0.0
 API_PORT=8000
 
-# ── LLM / Ollama ─────────────────────────────────────────────────────
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=phi3:3.8b              # or: mistral, llama3, gemma2 etc.
+OLLAMA_MODEL=phi3:3.8b
 LLM_ENABLED=true
-LLM_MIN_CONFIDENCE=0.5              # Only call LLM for alerts above this threshold
-LLM_MAX_CALLS_PER_MINUTE=10        # Rate limit for Ollama calls
-LLM_COOLDOWN_SECONDS=30             # Per-rule+src cooldown for LLM calls
+LLM_MIN_CONFIDENCE=0.5
+LLM_MAX_CALLS_PER_MINUTE=10
+LLM_COOLDOWN_SECONDS=30
 
-# ── Logging ──────────────────────────────────────────────────────────
-LOG_LEVEL=INFO                      # DEBUG | INFO | WARNING | ERROR
+LOG_LEVEL=INFO
 ```
 
 ---
